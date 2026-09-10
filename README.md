@@ -111,7 +111,7 @@ data path is broken and Kaggle quota would be wasted.
 - [ ] **M6** robustness on held-out conditions
 - [ ] **M8** ablation table
 - [x] **M9a** report figures (`aimd.eval.report`) — calibration, robustness, layer profile, faithfulness
-- [ ] **M9b** corrected architecture diagram (the original has three blocking errors)
+- [x] **M9b** corrected architecture diagram ([docs/architecture.md](docs/architecture.md))
 
 ### Splits
 

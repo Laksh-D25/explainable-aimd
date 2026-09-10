@@ -1,0 +1,65 @@
+%% Figure 1 — Detector architecture (corrected).
+%% See docs/architecture-review.md for what changed from the original and why.
+flowchart TD
+    IN["Audio Input<br/>SONICS: Real + Suno/Udio<br/>songs 32–240 s"]
+
+    subgraph PRE["Pre-processing"]
+        RS["Resampling<br/>24 kHz mono"] --> SG["Segmentation<br/>fixed 10 s clips<br/>8 per song"] --> NM["Peak<br/>Normalisation"]
+    end
+
+    AUG["Data Augmentation<br/><i>train split only</i><br/>MP3 128k · pitch ±2<br/>noise · gain"]
+
+    IN --> RS
+    NM --> READY(["Pre-processed Clips"])
+    AUG -.->|train split only| READY
+
+    PT["<i>Pre-training provenance</i><br/><i>NOT executed at inference</i><br/>RVQ-VAE acoustic teacher<br/>CQT musical teacher"]
+
+    subgraph DET["MERT + Attention-Pooling Detector"]
+        subgraph BB["MERT-v1-95M · frozen · 94.4M params"]
+            CONV["1-D Conv Feature Encoder<br/>512 channels × time"] --> TR["12-Layer Transformer<br/>13 hidden states · 768-d · 74.8 Hz"]
+        end
+        LN["Per-layer LayerNorm<br/><i>equalises layer scale before weighting</i>"]
+        LA["Layer Attention · softmax over 13 states → [T, 768]"]
+        TA["Temporal Attention Pooling · softmax over T → [768] per clip"]
+        SA["Clip → Song Attention · masked pooling → [768] per song"]
+        TR --> LN --> LA --> TA --> SA
+    end
+
+    READY --> CONV
+    PT -.->|weights only| BB
+
+    subgraph HEADS["Classification Heads · 0.62M trainable"]
+        BIN["<b>Binary Head — primary</b><br/>Real / Fake"]
+        TAX["Auxiliary Head<br/>4-way SONICS taxonomy"]
+        SRC["Source Attribution<br/><i>FakeMusicCaps closed-set</i>"]
+    end
+
+    SA --> BIN & TAX
+    SA -.-> SRC
+
+    CAL["Temperature Scaling<br/>fitted on validation · ECE reported<br/>threshold at 1% false-positive budget"]
+    BIN --> CAL
+    OUT(["Calibrated Prediction<br/>→ Figure 2"])
+    CAL --> OUT
+
+    classDef data fill:#d8ede1,stroke:#2f7d5a,color:#0b0b0b
+    classDef prep fill:#fbe6c2,stroke:#c98500,color:#0b0b0b
+    classDef model fill:#dbe8f7,stroke:#2a78d6,color:#0b0b0b
+    classDef pool fill:#f7dfe6,stroke:#d55181,color:#0b0b0b
+    classDef head fill:#e3dcf5,stroke:#4a3aa7,color:#0b0b0b
+    classDef out fill:#fbdcc4,stroke:#eb6834,color:#0b0b0b
+    classDef ghost fill:#f2f2ef,stroke:#9a9a94,color:#52514e,stroke-dasharray: 5 4
+
+    class IN,READY,OUT data
+    class RS,SG,NM,AUG prep
+    class CONV,TR,LN model
+    class LA,TA,SA pool
+    class BIN,TAX,SRC head
+    class CAL out
+    class PT ghost
+
+    style PRE fill:#fdf6e8,stroke:#c98500,color:#52514e
+    style DET fill:#eef4fc,stroke:#2a78d6,color:#52514e
+    style BB fill:#dce9f8,stroke:#2a78d6,color:#52514e
+    style HEADS fill:#f0ecfa,stroke:#4a3aa7,color:#52514e

@@ -1,0 +1,47 @@
+%% Figure 2 — Explainability layer and evaluation protocols.
+%% Annotations kept short deliberately; the nuance belongs in the caption.
+flowchart TD
+    IN(["Calibrated Prediction<br/>from Figure 1"])
+
+    subgraph XAI["3-Level Explainable AI Layer"]
+        L1["<b>Level 1</b><br/>Attention Weights<br/>layer · frame · clip"]
+        L2A["<b>Level 2a</b><br/>Temporal Relevance<br/><i>when</i>"]
+        L2B["<b>Level 2b</b><br/>T–F Occlusion<br/><i>which frequency</i>"]
+        L3["<b>Level 3</b><br/>Shapley over layers<br/>exact, 2¹³ coalitions"]
+    end
+
+    IN --> L1 & L2A & L2B & L3
+
+    FAITH["<b>Faithfulness Check</b><br/>deletion / insertion<br/>vs random baseline"]
+    CONTRAST["<b>L1 vs L3 agreement</b><br/>weighted vs decisive"]
+
+    %% Edges leave the subgraph as a whole rather than individual levels. Per-node
+    %% edges pull L1 and L3 toward their targets, and dagre then reorders the
+    %% levels so they no longer read 1 -> 2a -> 2b -> 3.
+    XAI --> FAITH
+    XAI --> CONTRAST
+
+    subgraph EVAL["Evaluation Protocols"]
+        E1["In-distribution<br/>SONICS test"]
+        E2["<b>Cross-generator</b><br/>FakeMusicCaps<br/>vs F1 0.629"]
+        E3["Robustness<br/>held-out conditions"]
+    end
+
+    IN --> E1 & E2 & E3
+
+    OUT["Calibrated, Auditable<br/>Explanation Output"]
+    FAITH --> OUT
+    CONTRAST --> OUT
+
+    classDef data fill:#d8ede1,stroke:#2f7d5a,color:#0b0b0b
+    classDef xai fill:#d6ecf5,stroke:#1f7f9c,color:#0b0b0b
+    classDef check fill:#f7dfe6,stroke:#d55181,color:#0b0b0b
+    classDef out fill:#fbdcc4,stroke:#eb6834,color:#0b0b0b
+
+    class IN data
+    class L1,L2A,L2B,L3 xai
+    class FAITH,CONTRAST check
+    class E1,E2,E3,OUT out
+
+    style XAI fill:#e9f5fa,stroke:#1f7f9c,color:#52514e
+    style EVAL fill:#fdf0e6,stroke:#eb6834,color:#52514e

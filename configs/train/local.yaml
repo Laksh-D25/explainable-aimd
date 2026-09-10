@@ -3,8 +3,10 @@
 run: {name: local, seed: 1337, device: auto}
 train:
   epochs: 5
-  batch_size: 2            # 4 GB VRAM; raise only after measuring
+  batch_size: 2            # measured: batch 2 peaks at 3.33 GB of 3.7 GB usable; batch 4 OOMs
   clips_per_song: 4
+  # Explanations need <= ~1500 total frames (clips x sec x 75) on this GPU;
+  # see docs/performance.md before running the XAI step locally.
   clip_seconds: 10.0
   lr: 1.0e-3
   weight_decay: 0.01

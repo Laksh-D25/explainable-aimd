@@ -54,3 +54,28 @@ Two caveats the code states rather than hides:
 - **Levels 1 and 3 measure different things.** Attention weights are what the
   model *allocates*; Shapley values are what *moved this decision*. Disagreement
   is a faithfulness finding worth reporting, not a bug to tune away.
+
+## Protocol validation
+
+The protocol was exercised end-to-end on a synthetic corpus whose "fake" class
+carries a planted 6 kHz tone. The robustness table it produced is the evidence
+that the protocol measures what it claims:
+
+| Condition | F1 drop | |
+|---|---|---|
+| `noise_low_snr` | 0.000 | tone survives added noise |
+| `reverb` | 0.040 | smears but preserves the tone |
+| `time_stretch` | 0.111 | shifts it slightly |
+| `mp3_32` | 0.294 | low bitrate discards high frequencies |
+| `pitch_large` | 0.294 | moves the tone off its band |
+| `lowpass_4k` | 0.294 | removes a 6 kHz tone outright |
+
+The conditions that destroy the artefact are exactly the ones that break the
+detector, and the ones that leave it intact do not. That ordering is not
+something a broken pipeline produces by chance, so it stands as a check on the
+robustness protocol itself before it is pointed at real data.
+
+Two caveats on that run: the synthetic task is trivially separable, so the
+in-distribution F1 of 1.000 measures nothing, and with a perfectly separating
+model the 1% false-positive threshold collapses toward zero. Both are expected
+at this scale and both disappear on the real task.

@@ -36,7 +36,9 @@ class TemperatureScaler:
                 logit_t / log_t.exp(), label_t
             )
             loss.backward()
-            return loss
+            # LBFGS calls float() on the return value; handing back a tensor
+            # that still carries grad triggers a warning on every calibration.
+            return loss.detach()
 
         optimizer.step(closure)
         self.temperature = float(log_t.exp().item())

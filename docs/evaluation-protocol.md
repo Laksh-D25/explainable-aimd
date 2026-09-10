@@ -79,3 +79,24 @@ Two caveats on that run: the synthetic task is trivially separable, so the
 in-distribution F1 of 1.000 measures nothing, and with a perfectly separating
 model the 1% false-positive threshold collapses toward zero. Both are expected
 at this scale and both disappear on the real task.
+
+## Cross-generator data: a trap worth naming
+
+FakeMusicCaps ([Zenodo 15063698](https://zenodo.org/records/15063698), 12 GB)
+contains **only generated audio** — 27,605 clips of 10 s, 16 kHz mono, across
+five text-to-music models (AudioLDM2, MusicGen, MusicLDM, Mustango,
+StableAudioOpen), one directory per model, the directory name being the
+attribution label. The real recordings are a separate MusicCaps download.
+
+The tempting shortcut is to pair those generated clips with real songs from
+SONICS. **Do not.** SONICS real audio is full-length YouTube tracks; FakeMusicCaps
+is 10 s of 16 kHz mono regenerated from MusicCaps captions. A detector separating
+those is reading clip length and bandwidth, not synthesis artefacts. The
+resulting cross-generator F1 would likely look excellent and would mean nothing —
+and because it is the project's headline number, the error would sit at the
+centre of the claim rather than at its edge.
+
+The real class must come from MusicCaps originals, processed through the same
+pipeline. `load_fakemusiccaps_manifest` warns when `real_root` is absent, and
+the CLI prints the same warning in red, because a manifest with no real class
+cannot produce a detection metric at all.

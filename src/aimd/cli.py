@@ -57,6 +57,34 @@ def prepare_data(
     typer.secho(f"\nwrote {len(manifest)} songs to {out}", fg="green")
 
 
+@app.command("prepare-fakemusiccaps")
+def prepare_fakemusiccaps(
+    root: Path = typer.Option(..., help="FakeMusicCaps dir (one subdir per generator)"),
+    real_root: Path = typer.Option(None, help="MusicCaps real clips, processed identically"),
+    out: Path = typer.Option(Path("fmc_manifest.csv")),
+) -> None:
+    """Build the cross-generator evaluation manifest.
+
+    This dataset is never trained on -- it is the unseen-generator test that
+    produces the headline number against the base paper's F1 0.629.
+    """
+    from .data.manifest import load_fakemusiccaps_manifest
+
+    manifest = load_fakemusiccaps_manifest(str(root), str(real_root) if real_root else None)
+    manifest.to_csv(out, index=False)
+
+    typer.echo(manifest.groupby(["taxonomy", "source"], dropna=False).size().to_string())
+    if not (manifest["label"] == 0).any():
+        typer.secho(
+            "\nNO REAL CLASS: detection F1/AUROC/EER cannot be computed from this "
+            "manifest, and pairing these clips with real audio from another corpus "
+            "would measure the domain gap rather than the generator. Pass "
+            "--real-root with MusicCaps originals.",
+            fg="red",
+        )
+    typer.secho(f"\nwrote {len(manifest)} clips to {out}", fg="green")
+
+
 @app.command()
 def train(
     manifest: Path = typer.Option(...),

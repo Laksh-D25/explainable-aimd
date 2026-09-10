@@ -99,37 +99,6 @@ def test_input_manifest_is_not_mutated():
     assert "split" not in df.columns
 
 
-def test_official_splits_are_adopted_verbatim(tmp_path):
-    """SONICS publishes its own splits; using them is what makes the
-    in-distribution number comparable to its published F1."""
-    from aimd.data.manifest import apply_official_splits
-
-    df = fake_manifest(30)
-    files = {}
-    for name, ids in [
-        ("train", df["song_id"][:20]),
-        ("val", df["song_id"][20:25]),
-        ("test", df["song_id"][25:]),
-    ]:
-        path = tmp_path / f"{name}.csv"
-        pd.DataFrame({"id": ids}).to_csv(path, index=False)
-        files[name] = str(path)
-
-    out = apply_official_splits(df, files)
-    assert (out["split"] == "train").sum() == 20
-    assert (out["split"] == "test").sum() == 5
-    assert_no_leakage(out)
-
-
-def test_songs_missing_from_official_splits_fail_loudly(tmp_path):
-    """Silently dropping unassigned songs would change the evaluation set."""
-    from aimd.data.manifest import apply_official_splits
-
-    df = fake_manifest(30)
-    path = tmp_path / "train.csv"
-    pd.DataFrame({"id": df["song_id"][:10]}).to_csv(path, index=False)
-    with pytest.raises(ValueError, match="in no official split"):
-        apply_official_splits(df, {"train": str(path)})
 
 
 def test_empty_stratum_in_a_split_is_warned_about():
@@ -233,3 +202,118 @@ def test_fakemusiccaps_missing_root_fails_loudly(tmp_path):
     empty.mkdir()
     with pytest.raises(FileNotFoundError, match="no generator subdirectories"):
         load_fakemusiccaps_manifest(str(empty))
+
+
+# --- SONICS split CSVs (real schema) -----------------------------------------
+
+
+def _sonics_csv(tmp_path, name, rows):
+    """Write a CSV with SONICS's real column names and semantics."""
+    path = tmp_path / f"{name}.csv"
+    pd.DataFrame(rows).to_csv(path, index=False)
+    return str(path)
+
+
+def _sonics_rows():
+    return {
+        "train": [
+            # `id` is the SOURCE track and is shared by a real song and the
+            # tracks generated from it -- it is not a unique key.
+            {"id": 1, "filename": "real_00001", "filepath": "real_songs/real_00001.mp3",
+             "label": "real", "target": 0, "source": "youtube", "duration": 200.0},
+            {"id": 2, "filename": "fake_2_suno_0", "filepath": "fake_songs/fake_2_suno_0.mp3",
+             "label": "mostly fake", "target": 1, "source": "suno", "duration": 180.0},
+            {"id": 2, "filename": "fake_2_suno_1", "filepath": "fake_songs/fake_2_suno_1.mp3",
+             "label": "full fake", "target": 1, "source": "suno", "duration": 170.0},
+        ],
+        "val": [
+            {"id": 3, "filename": "real_00003", "filepath": "real_songs/real_00003.mp3",
+             "label": "real", "target": 0, "source": "youtube", "duration": 210.0},
+            {"id": 4, "filename": "fake_4_udio_0", "filepath": "fake_songs/fake_4_udio_0.mp3",
+             "label": "half fake", "target": 1, "source": "udio", "duration": 160.0},
+        ],
+        "test": [
+            {"id": 5, "filename": "real_00005", "filepath": "real_songs/real_00005.mp3",
+             "label": "real", "target": 0, "source": "youtube", "duration": 190.0},
+        ],
+    }
+
+
+@pytest.fixture
+def sonics_csvs(tmp_path):
+    rows = _sonics_rows()
+    return {k: _sonics_csv(tmp_path, k, v) for k, v in rows.items()}
+
+
+def test_taxonomy_comes_from_label_not_target(sonics_csvs):
+    """`target` is the binary 0/1 flag. Reading the taxonomy off it yields "1"
+    for every generated track and destroys the auxiliary head's supervision."""
+    from aimd.data.manifest import load_sonics_manifest
+
+    m = load_sonics_manifest(sonics_csvs)
+    assert set(m["taxonomy"]) == {"real", "mostly_fake", "full_fake", "half_fake"}
+    assert set(m["label"]) == {0, 1}
+    assert (m.loc[m["taxonomy"] == "real", "label"] == 0).all()
+    assert (m.loc[m["taxonomy"] != "real", "label"] == 1).all()
+
+
+def test_song_id_is_filename_because_id_is_not_unique(sonics_csvs):
+    """Two generated variants share one source `id`; only `filename` is unique."""
+    from aimd.data.manifest import load_sonics_manifest
+
+    m = load_sonics_manifest(sonics_csvs)
+    assert m["song_id"].is_unique
+    assert set(m.loc[m["group"] == "2", "song_id"]) == {"fake_2_suno_0", "fake_2_suno_1"}
+
+
+def test_splits_are_taken_from_the_files_not_regenerated(sonics_csvs):
+    from aimd.data.manifest import load_sonics_manifest
+
+    m = load_sonics_manifest(sonics_csvs)
+    assert m.groupby("split").size().to_dict() == {"train": 3, "val": 2, "test": 1}
+    assert_no_leakage(m)
+
+
+def test_audio_root_is_prefixed_to_relative_paths(sonics_csvs):
+    from aimd.data.manifest import load_sonics_manifest
+
+    m = load_sonics_manifest(sonics_csvs, audio_root="/data/sonics")
+    assert m["path"].iloc[0] == "/data/sonics/real_songs/real_00001.mp3"
+
+
+def test_per_class_csvs_are_rejected_with_a_useful_message(tmp_path):
+    """real_songs.csv and fake_songs.csv carry no filepath -- using them would
+    yield a manifest of NaN paths that only fails at load time."""
+    from aimd.data.manifest import load_sonics_manifest
+
+    path = _sonics_csv(tmp_path, "real_songs",
+                       [{"filename": "real_00001", "label": "real", "target": 0}])
+    with pytest.raises(ValueError, match="missing.*filepath|carry no filepath"):
+        load_sonics_manifest({"train": path})
+
+
+def test_unexpected_taxonomy_value_fails_loudly(tmp_path):
+    from aimd.data.manifest import load_sonics_manifest
+
+    path = _sonics_csv(tmp_path, "train", [
+        {"id": 1, "filename": "x", "filepath": "a.mp3", "label": "sort of fake", "target": 1}])
+    with pytest.raises(ValueError, match="unexpected taxonomy"):
+        load_sonics_manifest({"train": path})
+
+
+def test_group_overlap_report_counts_sources_spanning_splits(tmp_path):
+    """SONICS's own splits let a real song and its regenerations straddle
+    splits; the figure is reported rather than silently repaired."""
+    from aimd.data.manifest import group_overlap_report, load_sonics_manifest
+
+    csvs = {
+        "train": _sonics_csv(tmp_path, "train", [
+            {"id": 7, "filename": "real_7", "filepath": "r.mp3", "label": "real", "target": 0}]),
+        "test": _sonics_csv(tmp_path, "test", [
+            {"id": 7, "filename": "fake_7_suno_0", "filepath": "f.mp3",
+             "label": "full fake", "target": 1}]),
+    }
+    report = group_overlap_report(load_sonics_manifest(csvs))
+    assert report["groups_spanning_splits"] == 1
+    assert report["rows_affected"] == 2
+    assert report["fraction_affected"] == pytest.approx(1.0)

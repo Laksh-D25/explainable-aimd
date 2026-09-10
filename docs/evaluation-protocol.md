@@ -100,3 +100,35 @@ The real class must come from MusicCaps originals, processed through the same
 pipeline. `load_fakemusiccaps_manifest` warns when `real_root` is absent, and
 the CLI prints the same warning in red, because a manifest with no real class
 cannot produce a detection metric at all.
+
+## SONICS metadata: what the columns actually mean
+
+Verified against the real CSVs, because the README's description does not settle it:
+
+| Column | Meaning | Trap |
+|---|---|---|
+| `label` | the 4-way taxonomy (`real` / `full fake` / `half fake` / `mostly fake`) | not the binary flag |
+| `target` | binary 0/1 | reading the taxonomy off it gives `"1"` for every generated track, silently destroying the auxiliary head's supervision |
+| `filename` | unique per track | this is the song id |
+| `id` | the **source** track | **not unique** — several generated variants share one, and a real song shares it with the tracks generated from it |
+| `filepath` | relative audio path | present only in `train/valid/test.csv`, **not** in `real_songs.csv` / `fake_songs.csv` |
+
+So the manifest is built from the **split CSVs**. The two per-class files carry no
+`filepath` at all; a loader built on them produces a manifest of null paths that
+only fails much later, at audio load.
+
+Loaded from the real files, the manifest is **97,164 songs** — train 66,709 /
+val 4,440 / test 26,015 — matching the paper's "over 97k".
+
+### A caveat to report, not repair
+
+Because `id` links a real song to its regenerations, **4,349 source ids (12.9% of
+rows) span more than one official split**. For example `real_10003` sits in test
+while `fake_10003_suno_0`, generated from its lyrics and style, sits in
+validation.
+
+This is SONICS's own partition and it is kept, because re-splitting would break
+comparability with their published F1 — the entire reason for adopting it. The
+figure is surfaced by `group_overlap_report()`, printed by the CLI and the
+notebook, and belongs beside the in-distribution result rather than in a
+footnote. A stricter secondary analysis can group by the `group` column.

@@ -30,6 +30,9 @@ SPLITS = ("train", "val", "test")
 #: FakeMusicCaps). `source` is the generator, populated for attribution.
 COLUMNS = ("song_id", "path", "label", "taxonomy", "source", "duration")
 
+#: SONICS 4-way taxonomy, underscored. Index 0 is the only non-fake class.
+TAXONOMY_ORDER = ("real", "full_fake", "half_fake", "mostly_fake")
+
 
 @dataclass(frozen=True)
 class SplitRatios:
@@ -178,35 +181,87 @@ def binary_label(taxonomy: pd.Series) -> pd.Series:
     return (taxonomy != "real").astype(int)
 
 
-def load_sonics_manifest(real_csv: str, fake_csv: str) -> pd.DataFrame:
-    """Build a canonical manifest from SONICS's two CSVs."""
-    real = pd.read_csv(real_csv)
-    fake = pd.read_csv(fake_csv)
+def load_sonics_manifest(
+    split_csvs: dict[str, str] | None = None,
+    audio_root: str | None = None,
+    *,
+    train_csv: str | None = None,
+    valid_csv: str | None = None,
+    test_csv: str | None = None,
+) -> pd.DataFrame:
+    """Build a manifest from SONICS's split CSVs.
 
-    real_out = pd.DataFrame(
-        {
-            "song_id": real.get("id", real.index).astype(str),
-            "path": real.get("filepath", pd.NA),
-            "taxonomy": "real",
-            "source": pd.NA,
-            "duration": real.get("duration", pd.NA),
-        }
-    )
-    # SONICS spells the subtypes with spaces ("full fake"); normalise to the
-    # underscored form used by TAXONOMY_CLASSES.
-    fake_out = pd.DataFrame(
-        {
-            "song_id": fake.get("id", fake.index).astype(str),
-            "path": fake.get("filepath", pd.NA),
-            "taxonomy": fake["target"].astype(str).str.strip().str.replace(" ", "_"),
-            "source": fake.get("source", pd.NA),
-            "duration": fake.get("duration", pd.NA),
-        }
-    )
+    Read the **split** CSVs (train/valid/test.csv), not real_songs.csv and
+    fake_songs.csv. The split files are the only complete manifests: they carry
+    `filepath` and `split`, which the two per-class files do not, and they
+    already merge real and generated rows.
 
-    df = pd.concat([real_out, fake_out], ignore_index=True)
-    df["label"] = binary_label(df["taxonomy"])
-    return df[list(COLUMNS)]
+    Column semantics, which are easy to get backwards:
+
+    * ``label``  -- the 4-way taxonomy (``real``/``full fake``/``half fake``/
+      ``mostly fake``), normalised here to underscores.
+    * ``target`` -- the binary 0/1 flag. Reading the taxonomy off ``target``
+      yields "1" for every generated track and silently destroys the auxiliary
+      head's supervision.
+    * ``filename`` -- unique per track, so it is the song id.
+    * ``id`` -- the *source* track id, and **not unique**: several generated
+      variants share one id (``fake_53858_suno_0`` and ``..._1``). It is kept
+      as ``group`` so a custom split can avoid putting variants of the same
+      source on both sides.
+
+    Args:
+        split_csvs: mapping of split name -> CSV path, e.g.
+            ``{"train": ".../train.csv", "val": ".../valid.csv",
+               "test": ".../test.csv"}``. SONICS names its file ``valid.csv``
+            while this project uses ``val`` internally.
+        audio_root: prefix joined to each relative ``filepath``.
+    """
+    from pathlib import Path
+
+    if split_csvs is None:
+        pairs = {"train": train_csv, "val": valid_csv, "test": test_csv}
+        split_csvs = {k: v for k, v in pairs.items() if v}
+    if not split_csvs:
+        raise ValueError("pass split_csvs, e.g. {'train': 'train.csv', ...}")
+
+    frames = []
+    for split, path in split_csvs.items():
+        if split not in SPLITS:
+            raise ValueError(f"unknown split {split!r}; expected one of {SPLITS}")
+        raw = pd.read_csv(path, low_memory=False)
+        missing = {"filename", "filepath", "label", "target"} - set(raw.columns)
+        if missing:
+            raise ValueError(
+                f"{path} is missing {sorted(missing)}. Use SONICS's train/valid/"
+                "test.csv -- real_songs.csv and fake_songs.csv carry no filepath."
+            )
+        frames.append(
+            pd.DataFrame(
+                {
+                    "song_id": raw["filename"].astype(str),
+                    "path": raw["filepath"].astype(str),
+                    "taxonomy": raw["label"].astype(str).str.strip().str.replace(" ", "_"),
+                    "source": raw.get("source", pd.NA),
+                    "duration": raw.get("duration", pd.NA),
+                    "label": raw["target"].astype(int),
+                    "group": raw.get("id", raw["filename"]).astype(str),
+                    "split": split,
+                }
+            )
+        )
+
+    df = pd.concat(frames, ignore_index=True)
+    if audio_root:
+        df["path"] = df["path"].apply(lambda p: str(Path(audio_root) / p))
+
+    unknown = set(df["taxonomy"]) - set(TAXONOMY_ORDER)
+    if unknown:
+        raise ValueError(f"unexpected taxonomy values {sorted(unknown)}")
+
+    df["split"] = df["split"].astype("string")
+    assert_no_duplicate_songs(df)
+    assert_no_leakage(df)
+    return df[[*COLUMNS, "group", "split"]]
 
 
 #: The five text-to-music generators in FakeMusicCaps. Directory names are the
@@ -312,6 +367,35 @@ def load_fakemusiccaps_manifest(
     df["label"] = binary_label(df["taxonomy"])
     assert_no_duplicate_songs(df)
     return df[list(COLUMNS)]
+
+
+def group_overlap_report(df: pd.DataFrame) -> dict:
+    """Quantify source tracks whose rows land in more than one split.
+
+    SONICS's ``id`` links a real song to the AI regenerations derived from it,
+    so one id can cover ``real_10003`` and ``fake_10003_suno_0`` alike. In the
+    official splits roughly 13% of rows belong to an id that spans splits --
+    a real song can sit in test while a track generated from its lyrics and
+    style sits in validation.
+
+    This is **not** silently repaired. Re-splitting would break comparability
+    with SONICS's published F1, which is the whole reason to adopt their
+    partition. Report the figure alongside the in-distribution result and let
+    the reader weigh it; use ``split_by_song(..., group_column="group")`` if a
+    stricter secondary analysis is wanted.
+    """
+    if "group" not in df.columns:
+        raise ValueError("manifest has no 'group' column; load it with load_sonics_manifest")
+    spans = df.groupby("group")["split"].nunique()
+    offending = set(spans[spans > 1].index)
+    rows = df[df["group"].isin(offending)]
+    return {
+        "groups_spanning_splits": len(offending),
+        "groups_total": int(spans.size),
+        "rows_affected": len(rows),
+        "rows_total": len(df),
+        "fraction_affected": len(rows) / max(len(df), 1),
+    }
 
 
 def summarize(df: pd.DataFrame) -> pd.DataFrame:

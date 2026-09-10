@@ -38,23 +38,39 @@ def info() -> None:
 
 @app.command("prepare-data")
 def prepare_data(
-    real_csv: Path = typer.Option(..., help="SONICS real_songs.csv"),
-    fake_csv: Path = typer.Option(..., help="SONICS fake_songs.csv"),
-    audio_root: Path = typer.Option(None, help="prefix for relative audio paths"),
+    train_csv: Path = typer.Option(..., help="SONICS train.csv"),
+    valid_csv: Path = typer.Option(..., help="SONICS valid.csv"),
+    test_csv: Path = typer.Option(..., help="SONICS test.csv"),
+    audio_root: Path = typer.Option(None, help="prefix for relative filepaths"),
     out: Path = typer.Option(Path("manifest.csv")),
-    seed: int = 1337,
 ) -> None:
-    """Build a song-level manifest with leak-free, stratified splits."""
-    from .data.manifest import load_sonics_manifest, split_by_song, summarize
+    """Build a manifest from SONICS's own split CSVs.
 
-    manifest = load_sonics_manifest(str(real_csv), str(fake_csv))
-    if audio_root:
-        manifest["path"] = manifest["path"].apply(lambda p: str(Path(audio_root) / str(p)))
+    Uses train/valid/test.csv rather than real_songs.csv and fake_songs.csv:
+    only the split files carry `filepath` and `split`. Their splits are adopted
+    verbatim so the in-distribution result stays comparable to SONICS's
+    published F1.
+    """
+    from .data.manifest import group_overlap_report, load_sonics_manifest, summarize
 
-    manifest = split_by_song(manifest, seed=seed)  # asserts no leakage internally
+    manifest = load_sonics_manifest(
+        {"train": str(train_csv), "val": str(valid_csv), "test": str(test_csv)},
+        audio_root=str(audio_root) if audio_root else None,
+    )
     manifest.to_csv(out, index=False)
     typer.echo(summarize(manifest).to_string())
-    typer.secho(f"\nwrote {len(manifest)} songs to {out}", fg="green")
+
+    report = group_overlap_report(manifest)
+    if report["groups_spanning_splits"]:
+        typer.secho(
+            f"\nNote: {report['groups_spanning_splits']:,} source ids span more than one "
+            f"split ({report['fraction_affected']:.1%} of rows). SONICS's `id` links a real "
+            "song to the tracks generated from it, so a real song can sit in test while a "
+            "track derived from its lyrics sits in validation. This is SONICS's own "
+            "partition, kept for comparability -- report the figure alongside the result.",
+            fg="yellow",
+        )
+    typer.secho(f"\nwrote {len(manifest):,} songs to {out}", fg="green")
 
 
 @app.command("prepare-fakemusiccaps")

@@ -66,6 +66,7 @@ pytest -m real_mert    # 7 integration tests against the real checkpoint (~400 M
 | `src/aimd/calibrate/` | temperature scaling, ECE |
 | `src/aimd/eval/` | in-distribution, cross-generator, robustness protocols |
 | `configs/experiment/` | the ablation table ([README](configs/experiment/README.md)) |
+| `src/aimd/eval/report.py` | the four write-up figures, each with its numbers as CSV |
 
 ## Usage
 
@@ -106,10 +107,11 @@ data path is broken and Kaggle quota would be wasted.
 - [x] **Protocols** in-distribution / cross-generator / robustness, CLI, Kaggle notebook (141 tests)
 - [ ] **M2b** overfit 100 real songs — run section 3 of the notebook
 - [ ] **M3** full SONICS training, in-distribution F1 vs SONICS's ~0.97
-- [ ] **M5** FakeMusicCaps cross-generator eval — needs an FMC manifest
+- [ ] **M5** FakeMusicCaps cross-generator eval — loader ready; needs MusicCaps real audio
 - [ ] **M6** robustness on held-out conditions
 - [ ] **M8** ablation table
-- [ ] **M9** report figures + corrected diagram
+- [x] **M9a** report figures (`aimd.eval.report`) — calibration, robustness, layer profile, faithfulness
+- [ ] **M9b** corrected architecture diagram (the original has three blocking errors)
 
 ### Splits
 

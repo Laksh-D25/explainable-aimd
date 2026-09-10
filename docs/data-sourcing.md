@@ -30,6 +30,52 @@ What sourcing it costs:
 Kaggle is a poor place to do this — datacenter IPs are throttled or blocked, and
 the 12 h session cap makes a long fetch fragile.
 
+### Fetching it — measured, not estimated
+
+`yt-dlp` works from a home connection; the failures seen initially were a stale
+2024 build against YouTube's current player API, not IP blocking. With the
+current version:
+
+| | |
+|---|---|
+| Throughput, 8 workers | **1.92 s/song** |
+| Full 48,090 | **~26 hours** wall clock |
+| Size at 48 kbps | ~69 GB |
+| Success rate | ~85% — the rest removed, private, region-locked or shorter than the dataset's window |
+
+`scripts/fetch_real_songs.py` does this **resumably**, which matters over a
+26-hour run:
+
+* every attempt appends to `fetch_state.jsonl` *as it finishes*, so an interrupt
+  loses at most the in-flight downloads;
+* on restart, completed songs and *permanent* failures (removed, private,
+  blocked) are skipped, while *transient* ones (timeout, network) are retried —
+  re-attempting dead videos every run would waste hours;
+* completion is verified against the audio, not file existence, because an
+  interrupted download leaves a large-but-truncated file that would otherwise be
+  accepted and silently train on short clips;
+* `--limit` samples with a fixed seed, so a resumed subset is the *same* subset.
+
+It also matches the generated set's bitrate (48 kbps) and honours `skip_time` +
+`duration`, so the real class does not become separable on codec or clip length.
+
+### Google Drive (1 TB) as the store
+
+Drive solves storage, not the fetch — the download still has to happen
+somewhere, and a home connection is more reliable than a datacenter IP for
+YouTube.
+
+A workflow that fits a 17 GB local disk:
+
+1. Fetch in batches locally with `--limit`, resuming as needed.
+2. `--shard-size 1500` packs finished songs into ~1.5 GB tar shards. **Do not
+   sync 48,000 loose files to Drive** — reading many small files over a mounted
+   drive makes training I/O-bound; a few large shards do not.
+3. Upload shards to Drive, delete locally, repeat.
+4. Train on **Colab**, which mounts Drive natively: copy one shard to the VM's
+   local disk, extract, train. Kaggle cannot mount Drive, so choosing Drive
+   means choosing Colab.
+
 **Practical route: a balanced subset.** Fetch a few thousand real songs, take an
 equal number of generated ones, and keep the official split proportions. State
 the subset size in the write-up. This gives a defensible in-distribution number

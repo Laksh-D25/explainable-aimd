@@ -67,6 +67,8 @@ pytest -m real_mert    # 7 integration tests against the real checkpoint (~400 M
 | `src/aimd/eval/` | in-distribution, cross-generator, robustness protocols |
 | `configs/experiment/` | the ablation table ([README](configs/experiment/README.md)) |
 | `src/aimd/eval/report.py` | the four write-up figures, each with its numbers as CSV |
+| `scripts/fetch_real_songs.py` | resumable YouTube fetch for SONICS's real class |
+| `scripts/upload_to_drive.py` | resumable rclone upload, frees local disk as it goes |
 
 ## Usage
 
@@ -105,7 +107,8 @@ data path is broken and Kaggle quota would be wasted.
 - [x] **M2** pipeline learns end-to-end on synthetic data, real MERT included
 - [x] **XAI** all three levels + faithfulness harness
 - [x] **Protocols** in-distribution / cross-generator / robustness, CLI, Kaggle notebook (141 tests)
-- [ ] **M2b** overfit 100 real songs — run section 3 of the notebook
+- [ ] **M2b** overfit 100 real songs — needs real audio first, see
+      [docs/fetching-real-audio.md](docs/fetching-real-audio.md)
 - [ ] **M3** full SONICS training, in-distribution F1 vs SONICS's ~0.97
 - [ ] **M5** FakeMusicCaps cross-generator eval — loader ready; needs MusicCaps real audio
 - [ ] **M6** robustness on held-out conditions

@@ -14,9 +14,14 @@ shorter than the dataset's window).
 YouTube's present player API, which looks exactly like an IP ban but is not:
 
 ```bash
-pip install -U yt-dlp
-yt-dlp --version          # expect 2026.xx
+cd /home/laksh/Downloads/rmml/code
+../.venv/bin/pip install -U yt-dlp
 ```
+
+The venv is at `/home/laksh/Downloads/rmml/.venv` — one level **above** `code/`,
+so every command below uses `../.venv/bin/python`. The scripts pick that
+interpreter's `yt-dlp` themselves and refuse to start on a pre-2025 build, so a
+stale system copy earlier on PATH cannot silently break the run.
 
 `rclone` is already installed at `~/.local/bin/rclone` (v1.75.1).
 
@@ -26,7 +31,7 @@ Do not commit 26 hours before knowing the pipeline trains. A 4,000-song subset
 takes about two hours and is enough for a defensible balanced result:
 
 ```bash
-python scripts/fetch_real_songs.py \
+../.venv/bin/python scripts/fetch_real_songs.py \
   --csv /path/to/real_songs.csv \
   --out ~/sonics/real_songs \
   --limit 4000 --workers 8 --shard-size 1500
@@ -74,7 +79,7 @@ With ~17 GB free locally and ~69 GB of audio, the loop is fetch → shard →
 upload → delete → repeat:
 
 ```bash
-python scripts/upload_to_drive.py \
+../.venv/bin/python scripts/upload_to_drive.py \
   --local ~/sonics/real_songs_shards \
   --remote gdrive:sonics/real_songs_shards \
   --delete-after-upload

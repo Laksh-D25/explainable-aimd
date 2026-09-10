@@ -105,3 +105,20 @@ def test_source_index_only_present_when_requested(manifest):
     assert "source" not in SongClipsDataset(manifest, SPEC, split="val")[0]
     item = SongClipsDataset(manifest, SPEC, split="val", sources=("suno", "udio"))[0]
     assert item["source"].item() == 0
+
+
+def test_length_changing_perturbation_still_yields_fixed_clips(manifest):
+    """MP3 encoding adds padding, so a round-trip returns more samples than it
+    was given. Every eval condition must still produce model-shaped clips."""
+    from aimd.data.perturb import EVAL_PERTURBATIONS
+
+    expected = (SPEC.max_clips, int(SPEC.clip_seconds * SR))
+    for condition in EVAL_PERTURBATIONS:
+        item = SongClipsDataset(manifest, SPEC, split="test", perturbation=condition)[0]
+        assert item["clips"].shape == expected, f"{condition.name} changed clip shape"
+
+
+def test_training_augmentation_preserves_clip_shape(manifest):
+    ds = SongClipsDataset(manifest, SPEC, split="train", augment=TrainAugment(probability=1.0))
+    for i in range(len(manifest)):
+        assert ds[i]["clips"].shape == (SPEC.max_clips, int(SPEC.clip_seconds * SR))

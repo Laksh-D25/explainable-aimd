@@ -117,3 +117,43 @@ def test_ablation_flags_all_run(stub_backbone, noise, layer_mode, frame_pool, us
 def test_source_head_enabled_by_n_sources(stub_backbone, noise):
     out = build(stub_backbone, n_sources=5).forward(noise())
     assert out.source_logits.shape == (2, 5)
+
+
+def test_padded_clips_do_not_reach_the_backbone(stub_backbone, noise):
+    """Padded clips get zero weight at the song pool, so running the frozen
+    backbone over them is wasted compute -- on a 4 GB GPU and a metered Kaggle
+    quota that is worth avoiding."""
+    calls = []
+    original = stub_backbone.forward
+
+    def counting_forward(wav, no_grad=False):
+        calls.append(wav.shape[0])
+        return original(wav, no_grad=no_grad)
+
+    stub_backbone.forward = counting_forward
+    try:
+        model = build(stub_backbone).eval()
+        wav = noise(batch=2, clips=4, seconds=1.0)
+        mask = torch.tensor([[True, True, False, False], [True, False, False, False]])
+        model.forward(wav, clip_mask=mask)
+    finally:
+        stub_backbone.forward = original
+
+    assert calls == [3], f"expected only the 3 real clips through the backbone, got {calls}"
+
+
+def test_skipping_padded_clips_does_not_change_the_result(stub_backbone, noise):
+    """The optimisation must be exactly equivalent, not approximately."""
+    model = build(stub_backbone).eval()
+    wav = noise(batch=2, clips=4, seconds=1.0)
+    mask = torch.tensor([[True, True, False, False], [True, True, True, True]])
+
+    optimised = model.forward(wav, clip_mask=mask).binary_logit
+
+    # Reference: run every clip through the backbone, then pool with the mask.
+    hidden = stub_backbone(wav.flatten(0, 1), no_grad=True)
+    reference = model.forward_from_hidden(
+        hidden.view(*wav.shape[:2], *hidden.shape[1:]), mask
+    ).binary_logit
+
+    torch.testing.assert_close(optimised, reference)

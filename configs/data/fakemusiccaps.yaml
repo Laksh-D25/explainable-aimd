@@ -6,6 +6,8 @@ data:
   sample_rate: 24000
   clip_seconds: 10.0
   clips_per_song: 8
-  max_clips: 12
+  # Match clips_per_song: segmentation returns fewer only for songs shorter
+  # than one clip, and every padded clip beyond that is wasted compute.
+  max_clips: 8
   eval_only: true
   n_sources: 5              # closed-set attribution, this dataset only

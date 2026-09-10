@@ -67,12 +67,29 @@ pytest -m real_mert    # 7 integration tests against the real checkpoint (~400 M
 | `src/aimd/eval/` | in-distribution, cross-generator, robustness protocols |
 | `configs/experiment/` | the ablation table ([README](configs/experiment/README.md)) |
 
+## Usage
+
+```bash
+pip install -e .
+
+python -m aimd.cli info                 # environment + perturbation backends
+python -m aimd.cli prepare-data --real-csv real_songs.csv --fake-csv fake_songs.csv
+python -m aimd.cli train    --manifest manifest.csv --out artifacts/run
+python -m aimd.cli evaluate --manifest manifest.csv --checkpoint artifacts/run/best.pt
+python -m aimd.cli explain  --manifest manifest.csv --checkpoint artifacts/run/best.pt --song-id s0042
+```
+
+Reportable numbers come from `notebooks/kaggle_train.ipynb`, which drives the
+same `aimd.pipeline` functions as the CLI — a notebook that diverges from the
+repo is how irreproducible results happen.
+
 ## Quick check
 
 ```bash
 python scripts/smoke_train.py --stub    # whole pipeline on synthetic audio, seconds
 python scripts/smoke_train.py           # same, with the real MERT backbone
 python scripts/bench_vram.py            # measure batch sizes that fit (run on Kaggle too)
+pytest                                  # 141 tests, no downloads
 ```
 
 `smoke_train.py` plants an obvious artefact in the fake class and runs the real
@@ -85,12 +102,19 @@ data path is broken and Kaggle quota would be wasted.
 - [x] **M0** scaffold, pinned env, MERT verified end-to-end
 - [x] **M1** manifests + song-ID splits + leakage guards + perturbation partition
 - [x] **M2** pipeline learns end-to-end on synthetic data, real MERT included
-- [x] **XAI** all three levels implemented + faithfulness harness (116 tests)
-- [ ] **M2b** overfit 100 real songs (sanity gate before spending Kaggle quota)
+- [x] **XAI** all three levels + faithfulness harness
+- [x] **Protocols** in-distribution / cross-generator / robustness, CLI, Kaggle notebook (141 tests)
+- [ ] **M2b** overfit 100 real songs — run section 3 of the notebook
 - [ ] **M3** full SONICS training, in-distribution F1 vs SONICS's ~0.97
-- [ ] **M4** clip→song aggregation + calibration + ECE
-- [ ] **M5** FakeMusicCaps cross-generator eval — the headline number
+- [ ] **M5** FakeMusicCaps cross-generator eval — needs an FMC manifest
 - [ ] **M6** robustness on held-out conditions
-- [ ] **M7** XAI levels + faithfulness
 - [ ] **M8** ablation table
 - [ ] **M9** report figures + corrected diagram
+
+### Splits
+
+SONICS publishes its own `train/valid/test.csv`. Those are adopted verbatim via
+`apply_official_splits` — a freshly generated partition measures a different
+problem and would break comparability with SONICS's published F1. The fallback
+`split_by_song` is leak-free and stratified, and warns when rounding leaves a
+class unrepresented in a split.

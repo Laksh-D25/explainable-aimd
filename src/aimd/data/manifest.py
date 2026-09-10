@@ -95,7 +95,78 @@ def split_by_song(
 
     out["split"] = out["split"].astype("string")
     assert_no_leakage(out)
+    warn_on_empty_strata(out, stratify_on)
     return out
+
+
+def apply_official_splits(
+    manifest: pd.DataFrame,
+    split_files: dict[str, str],
+    id_column: str = "id",
+) -> pd.DataFrame:
+    """Adopt a dataset's own published splits instead of generating new ones.
+
+    SONICS ships train.csv / valid.csv / test.csv. Using those rather than a
+    fresh random split is what makes the in-distribution number comparable to
+    SONICS's published ~0.97 F1 -- a different partition measures a different
+    problem, however carefully it is stratified.
+
+    Args:
+        split_files: mapping of split name -> CSV path, e.g.
+            {"train": ".../train.csv", "val": ".../valid.csv", "test": ".../test.csv"}
+        id_column: the column in those CSVs holding the song id.
+    """
+    assert_no_duplicate_songs(manifest)
+    out = manifest.copy()
+    out["split"] = pd.NA
+
+    for split, path in split_files.items():
+        if split not in SPLITS:
+            raise ValueError(f"unknown split {split!r}; expected one of {SPLITS}")
+        ids = set(pd.read_csv(path)[id_column].astype(str))
+        out.loc[out["song_id"].astype(str).isin(ids), "split"] = split
+
+    unassigned = int(out["split"].isna().sum())
+    if unassigned:
+        raise ValueError(
+            f"{unassigned} songs are in no official split. Either the id column "
+            f"({id_column!r}) is wrong or the manifest and split files disagree; "
+            "silently dropping them would change the evaluation set."
+        )
+
+    out["split"] = out["split"].astype("string")
+    assert_no_leakage(out)
+    warn_on_empty_strata(out)
+    return out
+
+
+def warn_on_empty_strata(df: pd.DataFrame, stratify_on: str = "taxonomy") -> list[str]:
+    """Warn when a class is absent from a split.
+
+    Rounding can empty a rare class out of val or test on a small manifest --
+    at which point metrics for that class are computed over nothing and read as
+    though they were measured. Loud at build time beats a silent zero in a
+    results table. Returns the problems found, for tests to assert on.
+    """
+    import warnings
+
+    problems = []
+    for split in SPLITS:
+        rows = df[df["split"] == split]
+        if rows.empty:
+            problems.append(f"split {split!r} is empty")
+            continue
+        for value in df[stratify_on].dropna().unique():
+            if not (rows[stratify_on] == value).any():
+                problems.append(f"{value!r} absent from split {split!r}")
+    if problems:
+        warnings.warn(
+            "split leaves some classes unrepresented: "
+            + "; ".join(problems)
+            + ". Metrics for those classes would be computed over no data.",
+            stacklevel=3,
+        )
+    return problems
 
 
 def binary_label(taxonomy: pd.Series) -> pd.Series:

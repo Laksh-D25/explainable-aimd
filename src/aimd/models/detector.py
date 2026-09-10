@@ -122,6 +122,18 @@ class Detector(nn.Module):
         if wav.dim() == 2:  # [B, N] -> single clip per song
             wav = wav.unsqueeze(1)
         b, c, n = wav.shape
-        hidden = self.backbone(wav.reshape(b * c, n), no_grad=backbone_no_grad)
+        flat = wav.reshape(b * c, n)
+
+        if clip_mask is None:
+            hidden = self.backbone(flat, no_grad=backbone_no_grad)
+        else:
+            # Padded clips contribute nothing -- the song pool gives them zero
+            # weight -- so running the backbone over them is pure waste. Songs
+            # vary in length, so on a real batch this is a meaningful saving.
+            valid = clip_mask.reshape(-1)
+            packed = self.backbone(flat[valid], no_grad=backbone_no_grad)
+            hidden = packed.new_zeros((b * c, *packed.shape[1:]))
+            hidden[valid] = packed
+
         hidden = hidden.view(b, c, *hidden.shape[1:])
         return self.forward_from_hidden(hidden, clip_mask, frame_mask)

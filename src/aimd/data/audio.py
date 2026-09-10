@@ -86,6 +86,23 @@ def segment(
     return clips
 
 
+def fit_length(wav: np.ndarray, n_samples: int) -> np.ndarray:
+    """Trim or zero-pad to exactly `n_samples`.
+
+    Perturbations do not all preserve length -- MP3 encoding in particular adds
+    encoder padding, so a round-trip returns slightly more samples than it was
+    given. The model needs fixed-length clips, so length is pinned after any
+    perturbation rather than assumed.
+    """
+    if len(wav) == n_samples:
+        return wav.astype(np.float32)
+    if len(wav) > n_samples:
+        return wav[:n_samples].astype(np.float32)
+    out = np.zeros(n_samples, dtype=np.float32)
+    out[: len(wav)] = wav
+    return out
+
+
 def pad_clips(clips: np.ndarray, max_clips: int) -> tuple[np.ndarray, np.ndarray]:
     """Pad a clip stack to `max_clips` -> (clips, mask).
 

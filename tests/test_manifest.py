@@ -97,3 +97,56 @@ def test_input_manifest_is_not_mutated():
     df = fake_manifest(50)
     split_by_song(df)
     assert "split" not in df.columns
+
+
+def test_official_splits_are_adopted_verbatim(tmp_path):
+    """SONICS publishes its own splits; using them is what makes the
+    in-distribution number comparable to its published F1."""
+    from aimd.data.manifest import apply_official_splits
+
+    df = fake_manifest(30)
+    files = {}
+    for name, ids in [
+        ("train", df["song_id"][:20]),
+        ("val", df["song_id"][20:25]),
+        ("test", df["song_id"][25:]),
+    ]:
+        path = tmp_path / f"{name}.csv"
+        pd.DataFrame({"id": ids}).to_csv(path, index=False)
+        files[name] = str(path)
+
+    out = apply_official_splits(df, files)
+    assert (out["split"] == "train").sum() == 20
+    assert (out["split"] == "test").sum() == 5
+    assert_no_leakage(out)
+
+
+def test_songs_missing_from_official_splits_fail_loudly(tmp_path):
+    """Silently dropping unassigned songs would change the evaluation set."""
+    from aimd.data.manifest import apply_official_splits
+
+    df = fake_manifest(30)
+    path = tmp_path / "train.csv"
+    pd.DataFrame({"id": df["song_id"][:10]}).to_csv(path, index=False)
+    with pytest.raises(ValueError, match="in no official split"):
+        apply_official_splits(df, {"train": str(path)})
+
+
+def test_empty_stratum_in_a_split_is_warned_about():
+    """Rounding can empty a rare class out of test on a small manifest; a
+    silent zero in a results table reads as a measurement."""
+    from aimd.data.manifest import warn_on_empty_strata
+
+    with pytest.warns(UserWarning, match="unrepresented"):
+        df = split_by_song(fake_manifest(40))
+
+    problems = warn_on_empty_strata(df)
+    assert problems, "expected at least one absent class at this size"
+
+
+def test_large_manifest_warns_about_nothing():
+    import warnings
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        split_by_song(fake_manifest(2000))

@@ -80,3 +80,12 @@ def test_peak_normalize_scales_to_target_and_survives_silence():
 def test_unknown_strategy_is_rejected():
     with pytest.raises(ValueError, match="unknown segmentation strategy"):
         clip_offsets(SR * 60, SR * 10, 4, "sliding", None)
+
+
+def test_fit_length_trims_and_pads():
+    from aimd.data.audio import fit_length
+
+    assert len(fit_length(np.zeros(100, dtype=np.float32), 50)) == 50
+    padded = fit_length(np.ones(30, dtype=np.float32), 50)
+    assert len(padded) == 50 and padded[30:].sum() == 0
+    assert len(fit_length(np.zeros(50, dtype=np.float32), 50)) == 50

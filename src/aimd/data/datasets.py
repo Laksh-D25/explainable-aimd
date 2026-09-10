@@ -23,7 +23,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from .audio import load_audio, pad_clips, peak_normalize, segment
+from .audio import fit_length, load_audio, pad_clips, peak_normalize, segment
 from .perturb import Perturbation, TrainAugment
 
 
@@ -106,12 +106,20 @@ class SongClipsDataset(Dataset):
             rng=rng,
         )
 
+        # Perturbations may not preserve length (MP3 adds encoder padding), so
+        # every clip is pinned back to the configured size.
+        clip_samples = clips.shape[1]
         if self.augment is not None:
-            clips = np.stack([self.augment(c, spec.sample_rate) for c in clips])
+            clips = np.stack(
+                [fit_length(self.augment(c, spec.sample_rate), clip_samples) for c in clips]
+            )
         elif self.perturbation is not None:
             clips = np.stack(
                 [
-                    np.asarray(self.perturbation(c, spec.sample_rate), dtype=np.float32)
+                    fit_length(
+                        np.asarray(self.perturbation(c, spec.sample_rate), dtype=np.float32),
+                        clip_samples,
+                    )
                     for c in clips
                 ]
             )

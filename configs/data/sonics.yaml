@@ -7,7 +7,9 @@ data:
   clip_seconds: 10.0        # >= 0.1 s or MP3 augmentation silently no-ops
   clips_per_song: 8         # segments sampled per song; song_pool aggregates them
   # SONICS songs run 32-240 s, so clip counts vary; short songs are padded and masked.
-  max_clips: 12
+  # Match clips_per_song: segmentation returns fewer only for songs shorter
+  # than one clip, and every padded clip beyond that is wasted compute.
+  max_clips: 8
   split:
     by: song_id             # never by clip: two clips of one song across splits leaks
     ratios: {train: 0.8, val: 0.1, test: 0.1}

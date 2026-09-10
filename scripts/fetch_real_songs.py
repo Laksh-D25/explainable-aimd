@@ -43,7 +43,9 @@ import argparse
 import concurrent.futures as cf
 import json
 import signal
+import shutil
 import subprocess
+import sys
 import tarfile
 import threading
 import time
@@ -52,6 +54,43 @@ from pathlib import Path
 import pandas as pd
 
 BITRATE_MATCHING_SONICS = "48K"
+
+#: Builds older than this fail on every video against YouTube's current player
+#: API, which looks exactly like an IP ban. Checked at startup because the
+#: symptom is so misleading.
+MIN_YT_DLP_YEAR = 2025
+
+
+def resolve_yt_dlp() -> str:
+    """Prefer the yt-dlp next to the running interpreter.
+
+    A stale system-wide yt-dlp earlier on PATH than the virtualenv's is a real
+    hazard: every download fails with "Requested format is not available", which
+    reads as a YouTube block rather than a version problem.
+    """
+    candidate = Path(sys.executable).parent / "yt-dlp"
+    if candidate.exists():
+        return str(candidate)
+    found = shutil.which("yt-dlp")
+    if not found:
+        raise SystemExit("yt-dlp not found. Install it with: pip install -U yt-dlp")
+    return found
+
+
+def check_yt_dlp(binary: str) -> str:
+    version = subprocess.run([binary, "--version"], capture_output=True,
+                             text=True, timeout=60).stdout.strip()
+    try:
+        year = int(version.split(".")[0])
+    except (ValueError, IndexError):
+        year = 0
+    if year and year < MIN_YT_DLP_YEAR:
+        raise SystemExit(
+            f"yt-dlp {version} at {binary} is too old -- it fails on every video "
+            "against YouTube's current player API, which looks like an IP ban but "
+            "is not. Fix with:\n    pip install -U yt-dlp"
+        )
+    return version
 
 #: Retrying these on every resume would waste hours for no chance of success.
 PERMANENT = {"private", "removed", "unavailable", "blocked", "age_restricted", "too_short"}
@@ -133,7 +172,8 @@ def classify_error(stderr: bytes) -> str:
     return "failed"
 
 
-def fetch_one(row: dict, out_dir: Path, bitrate: str, timeout: int) -> tuple[str, str]:
+def fetch_one(row: dict, out_dir: Path, bitrate: str, timeout: int,
+              yt_dlp: str = "yt-dlp") -> tuple[str, str]:
     name = str(row["filename"])
     target = out_dir / f"{name}.mp3"
     expected = float(row.get("duration") or 0.0)
@@ -147,7 +187,7 @@ def fetch_one(row: dict, out_dir: Path, bitrate: str, timeout: int) -> tuple[str
 
     start = float(row.get("skip_time") or 0.0)
     cmd = [
-        "yt-dlp", "-q", "--no-warnings", "--no-progress",
+        yt_dlp, "-q", "--no-warnings", "--no-progress",
         "-f", "bestaudio/best", "-x", "--audio-format", "mp3",
         "--audio-quality", bitrate,
         "-o", str(out_dir / f"{name}.%(ext)s"),
@@ -214,10 +254,17 @@ def main() -> int:
     ap.add_argument("--shard-size", type=int, default=None)
     args = ap.parse_args()
 
+    yt_dlp = resolve_yt_dlp()
+    print(f"yt-dlp {check_yt_dlp(yt_dlp)} ({yt_dlp})")
+
     rows = pd.read_csv(args.csv, low_memory=False)
     if args.split:
         rows = rows[rows["split"] == args.split]
-    if args.limit:
+    if args.limit is not None:
+        # `is not None`, not truthiness: `--limit 0` must mean zero, not "no
+        # limit". The falsy check silently started a 48,090-song fetch.
+        if args.limit < 0:
+            raise SystemExit("--limit must be >= 0")
         # Sample rather than head: the CSV is ordered and its head is not
         # representative. Fixed seed so a resumed subset is the SAME subset.
         rows = rows.sample(n=min(args.limit, len(rows)), random_state=1337)
@@ -247,7 +294,7 @@ def main() -> int:
     completed = 0
     with cf.ThreadPoolExecutor(max_workers=args.workers) as pool:
         futures = {
-            pool.submit(fetch_one, r, args.out, args.bitrate, args.timeout): r
+            pool.submit(fetch_one, r, args.out, args.bitrate, args.timeout, yt_dlp): r
             for r in pending
         }
         for fut in cf.as_completed(futures):

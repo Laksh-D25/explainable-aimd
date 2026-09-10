@@ -110,3 +110,46 @@ def test_is_complete_accepts_a_real_clip_of_expected_length(tmp_path):
 )
 def test_errors_are_classified_for_resume(stderr, expected):
     assert classify_error(stderr) == expected
+
+
+def test_limit_zero_means_zero_not_unlimited(tmp_path):
+    """`--limit 0` once fell through a truthiness check and began fetching all
+    48,090 songs. A bounded flag that silently unbounds itself is dangerous."""
+    import subprocess
+    import sys
+
+    import pandas as pd
+
+    csv = tmp_path / "real_songs.csv"
+    pd.DataFrame([
+        {"filename": f"real_{i}", "youtube_id": f"id{i}", "duration": 10.0, "skip_time": 0.0}
+        for i in range(25)
+    ]).to_csv(csv, index=False)
+
+    script = Path(__file__).resolve().parents[1] / "scripts" / "fetch_real_songs.py"
+    proc = subprocess.run(
+        [sys.executable, str(script), "--csv", str(csv),
+         "--out", str(tmp_path / "out"), "--limit", "0"],
+        capture_output=True, text=True, timeout=120,
+    )
+    assert "0 to fetch" in proc.stdout, proc.stdout + proc.stderr
+    assert "25 to fetch" not in proc.stdout
+
+
+def test_negative_limit_is_rejected(tmp_path):
+    import subprocess
+    import sys
+
+    import pandas as pd
+
+    csv = tmp_path / "real_songs.csv"
+    pd.DataFrame([{"filename": "r", "youtube_id": "x", "duration": 10.0,
+                   "skip_time": 0.0}]).to_csv(csv, index=False)
+    script = Path(__file__).resolve().parents[1] / "scripts" / "fetch_real_songs.py"
+    proc = subprocess.run(
+        [sys.executable, str(script), "--csv", str(csv),
+         "--out", str(tmp_path / "out"), "--limit", "-5"],
+        capture_output=True, text=True, timeout=120,
+    )
+    assert proc.returncode != 0
+    assert "must be >= 0" in proc.stdout + proc.stderr

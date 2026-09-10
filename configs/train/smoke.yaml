@@ -1,0 +1,10 @@
+# Local sanity run: synthetic/tiny data, CPU, seconds not hours.
+run: {name: smoke, seed: 0, device: cpu}
+train:
+  epochs: 1
+  batch_size: 2
+  clips_per_song: 2
+  clip_seconds: 1.0
+  lr: 1.0e-3
+  limit_songs: 8
+  backbone_no_grad: true

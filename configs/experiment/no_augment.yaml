@@ -1,0 +1,4 @@
+# Training augmentation off. Held-out robustness conditions are unchanged,
+# so this separates "robust because augmented" from "robust because of MERT".
+defaults: {model: mert95_attnpool}
+augment: {enabled: false}

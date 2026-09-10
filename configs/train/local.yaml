@@ -1,0 +1,14 @@
+# Development on the dev subset. Local box is 4 GB VRAM / near-full disk, so this
+# is for debugging the pipeline, NOT for producing reportable numbers.
+run: {name: local, seed: 1337, device: auto}
+train:
+  epochs: 5
+  batch_size: 2            # 4 GB VRAM; raise only after measuring
+  clips_per_song: 4
+  clip_seconds: 10.0
+  lr: 1.0e-3
+  weight_decay: 0.01
+  limit_songs: 200
+  num_workers: 4
+  backbone_no_grad: true
+  amp: false               # CPU-only torch locally

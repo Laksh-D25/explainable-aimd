@@ -1,0 +1,14 @@
+__pycache__/
+*.py[cod]
+.venv/
+/artifacts/
+/data/
+*.ckpt
+*.pt
+.pytest_cache/
+.ipynb_checkpoints/
+*.egg-info/
+
+# Unrelated to this project (Raspberry Pi / Raft cluster spec that happened to
+# live in the same folder). The two source PDFs for this project are tracked.
+architecture_spec-v2.pdf

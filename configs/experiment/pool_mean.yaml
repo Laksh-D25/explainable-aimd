@@ -1,0 +1,5 @@
+# Replaces attention pooling over frames with a plain mean.
+# This is the comparison the novelty claim rests on: Guo et al. showed attentive
+# pooling beats average pooling for speech anti-spoofing, never for music.
+defaults: {model: mert95_attnpool}
+model: {frame_pool: mean}

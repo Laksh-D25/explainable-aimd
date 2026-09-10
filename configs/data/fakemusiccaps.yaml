@@ -1,0 +1,11 @@
+# Cross-generator evaluation set. Never trained on -- it is the unseen-generator
+# test that produces the headline number against the base paper's F1 0.629.
+data:
+  name: fakemusiccaps
+  hf_dataset: LucaComanducci/FakeMusicCaps
+  sample_rate: 24000
+  clip_seconds: 10.0
+  clips_per_song: 8
+  max_clips: 12
+  eval_only: true
+  n_sources: 5              # closed-set attribution, this dataset only

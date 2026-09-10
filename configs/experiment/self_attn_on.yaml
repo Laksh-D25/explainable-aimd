@@ -1,0 +1,5 @@
+# Restores the self-attention aggregation block drawn in the architecture.
+# It sits between two stages that already mix across time, so it has to show a
+# gain to stay in the default path.
+defaults: {model: mert95_attnpool}
+model: {use_self_attn: true}

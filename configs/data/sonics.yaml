@@ -1,0 +1,18 @@
+data:
+  name: sonics
+  # Kaggle mirror; avoids pulling ~250 GB onto local disk.
+  kaggle_dataset: awsaf49/sonics-dataset
+  hf_dataset: awsaf49/sonics
+  sample_rate: 24000        # MERT's rate; resample on load
+  clip_seconds: 10.0        # >= 0.1 s or MP3 augmentation silently no-ops
+  clips_per_song: 8         # segments sampled per song; song_pool aggregates them
+  # SONICS songs run 32-240 s, so clip counts vary; short songs are padded and masked.
+  max_clips: 12
+  split:
+    by: song_id             # never by clip: two clips of one song across splits leaks
+    ratios: {train: 0.8, val: 0.1, test: 0.1}
+    seed: 1337
+  taxonomy: [real, full_fake, half_fake, mostly_fake]
+augment:
+  enabled: true             # train split ONLY, applied after splitting
+  probability: 0.5

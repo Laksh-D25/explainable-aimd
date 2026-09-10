@@ -1,0 +1,2 @@
+# The corrected default, unchanged. Reference row for every other ablation.
+defaults: {model: mert95_attnpool}

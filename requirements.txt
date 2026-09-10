@@ -1,0 +1,36 @@
+# Core. Local installs the CPU torch build (see README: root partition is near-full);
+# Kaggle images already ship a CUDA torch, so torch/torchaudio are pinned by minor
+# version only and should NOT be reinstalled there.
+torch>=2.4,<2.9
+# The <2.9 pin is load-bearing: torchaudio's decoding backend is deprecated
+# and removed in 2.9 (moves to TorchCodec). Migrate data/audio.py before lifting it.
+torchaudio>=2.4,<2.9
+
+# MERT loads via trust_remote_code; its remote module imports nnAudio.
+transformers>=4.40,<4.50
+nnAudio>=0.3.2
+huggingface_hub>=0.23
+
+numpy>=1.26
+scipy>=1.11
+pandas>=2.0
+soundfile>=0.12
+
+# Perturbations (train-seen and held-out eval sets).
+# The two extras are NOT optional here: MP3 compression is the headline
+# robustness condition in the base paper, and reverb is a held-out family.
+audiomentations>=0.35
+fast_mp3_augment>=0.1
+pyroomacoustics>=0.7
+
+# Metrics / XAI
+torchmetrics>=1.4
+captum>=0.7
+shap>=0.45
+
+# Config + CLI
+omegaconf>=2.3
+typer>=0.12
+
+# Plotting for reports
+matplotlib>=3.8

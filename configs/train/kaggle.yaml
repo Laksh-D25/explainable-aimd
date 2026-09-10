@@ -1,0 +1,19 @@
+# Where reportable numbers come from: T4 16 GB, ~30 h/week quota.
+# The quota is the binding constraint on the full run + ablation sweep, so the
+# architecture should be settled on the dev subset before starting these.
+run: {name: kaggle, seed: 1337, device: cuda}
+train:
+  epochs: 15
+  batch_size: 8
+  clips_per_song: 8
+  clip_seconds: 10.0
+  lr: 1.0e-3
+  weight_decay: 0.01
+  aux_loss_weight: 0.3     # weight on the auxiliary 4-way taxonomy head
+  limit_songs: null
+  num_workers: 2
+  backbone_no_grad: true
+  amp: true                # fp16 for the frozen backbone
+  # Feature caching is deliberately absent: 13 x 750 frames x 768 in fp16 is
+  # ~15 MB per 10 s clip, so caching SONICS would need multiple TB. The frozen
+  # backbone runs on the fly instead.

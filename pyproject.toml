@@ -1,0 +1,25 @@
+[project]
+name = "aimd"
+version = "0.1.0"
+description = "Explainable AI-generated music detection with MERT and attention pooling"
+requires-python = ">=3.10"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+markers = [
+    "real_mert: downloads and runs the real MERT checkpoint (~400 MB, slow)",
+]
+# The real-MERT tests are opt-in: `pytest -m real_mert`.
+addopts = "-m 'not real_mert'"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

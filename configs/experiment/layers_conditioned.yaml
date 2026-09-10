@@ -1,0 +1,4 @@
+# Per-example layer weighting instead of one global profile. More expressive,
+# but costs the single readable layer profile that XAI level 1 reports.
+defaults: {model: mert95_attnpool}
+model: {layer_mode: conditioned}

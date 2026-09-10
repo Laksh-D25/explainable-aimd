@@ -1,0 +1,4 @@
+# Last-layer features only, the common baseline. Zhang et al. (SLS) and
+# El Kheir et al. report intermediate layers carry more discriminative signal.
+defaults: {model: mert95_attnpool}
+model: {layer_mode: last}

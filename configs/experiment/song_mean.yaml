@@ -1,0 +1,4 @@
+# Mean over clips instead of attentive song pooling. Tests whether the
+# model benefits from weighting which parts of a song carry the artefacts.
+defaults: {model: mert95_attnpool}
+model: {song_pool: mean}

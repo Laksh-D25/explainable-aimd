@@ -1,0 +1,12 @@
+# Default (corrected) architecture. Ablation variants live in configs/experiment/.
+model:
+  model_name: m-a-p/MERT-v1-95M
+  proj_dim: null          # null keeps MERT's 768; set an int to project down
+  layer_mode: static      # static | conditioned | last   (aggregation over 13 states)
+  frame_pool: attn        # attn | mean                   (over T frames)
+  song_pool: attn         # attn | mean                   (over clips of a song)
+  use_self_attn: false    # the diagram's self-attention block, off pending ablation
+  head_hidden: 256
+  dropout: 0.1
+  use_taxonomy_head: true # auxiliary SONICS 4-way head
+  n_sources: null         # set to 5 for FakeMusicCaps closed-set attribution only

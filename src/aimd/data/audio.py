@@ -118,3 +118,66 @@ def pad_clips(clips: np.ndarray, max_clips: int) -> tuple[np.ndarray, np.ndarray
     mask = np.zeros(max_clips, dtype=bool)
     mask[:n] = True
     return padded, mask
+
+
+def spectral_rolloff(wav: np.ndarray, sample_rate: int, percentile: float = 0.99) -> float:
+    """Frequency (Hz) below which `percentile` of spectral energy lies.
+
+    Used to detect a bandwidth mismatch between classes -- see
+    `bandwidth_report`.
+    """
+    spectrum = np.abs(np.fft.rfft(wav * np.hanning(len(wav)))) ** 2
+    freqs = np.fft.rfftfreq(len(wav), 1 / sample_rate)
+    total = spectrum.sum()
+    if total <= 0:
+        return 0.0
+    return float(freqs[np.searchsorted(np.cumsum(spectrum), percentile * total)])
+
+
+def bandwidth_report(
+    manifest,
+    n_per_class: int = 40,
+    sample_rate: int = TARGET_SAMPLE_RATE,
+    seconds: float = 5.0,
+    seed: int = 0,
+) -> dict:
+    """Compare spectral bandwidth between the real and fake classes.
+
+    A detector trained on classes that differ in bandwidth learns the codec
+    chain, not the generator. The failure is invisible in the metrics -- it
+    produces an *excellent* score -- so it has to be checked directly.
+
+    The case that motivated this: FakeMusicCaps generated audio is 16 kHz,
+    while MusicCaps real audio is 48 kHz. Resampled to MERT's 24 kHz, the
+    generated clips carry nothing above 8 kHz and the real ones reach 12 kHz.
+    Separating those is trivial and meaningless. The fix is to band-limit the
+    real audio to the generated audio's rate *before* resampling, so both
+    classes traverse the same chain.
+
+    Returns median rolloff per class and the ratio between them. A ratio far
+    from 1.0 means the classes are distinguishable on bandwidth alone.
+    """
+    rng = np.random.default_rng(seed)
+    out: dict = {}
+    for label, name in ((0, "real"), (1, "fake")):
+        rows = manifest[manifest["label"] == label]
+        if rows.empty:
+            continue
+        take = rows.iloc[rng.permutation(len(rows))[:n_per_class]]
+        values = []
+        for path in take["path"]:
+            try:
+                wav = load_audio(path, sample_rate)[: int(seconds * sample_rate)]
+                if len(wav) > 1024:
+                    values.append(spectral_rolloff(wav, sample_rate))
+            except Exception:
+                continue
+        if values:
+            out[f"{name}_rolloff_hz"] = float(np.median(values))
+            out[f"{name}_n"] = len(values)
+
+    if "real_rolloff_hz" in out and "fake_rolloff_hz" in out:
+        lo, hi = sorted((out["real_rolloff_hz"], out["fake_rolloff_hz"]))
+        out["ratio"] = hi / lo if lo > 0 else float("inf")
+        out["suspicious"] = out["ratio"] > 1.15
+    return out

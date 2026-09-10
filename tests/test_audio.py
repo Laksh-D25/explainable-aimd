@@ -89,3 +89,78 @@ def test_fit_length_trims_and_pads():
     padded = fit_length(np.ones(30, dtype=np.float32), 50)
     assert len(padded) == 50 and padded[30:].sum() == 0
     assert len(fit_length(np.zeros(50, dtype=np.float32), 50)) == 50
+
+
+# --- bandwidth confound -------------------------------------------------------
+
+
+def _write(path, wav, sr=SR):
+    import soundfile as sf
+    sf.write(path, wav.astype(np.float32), sr)
+
+
+def _band_limited(seconds, cutoff_hz, sr=SR, seed=0):
+    """Noise with energy only below `cutoff_hz` -- stands in for a codec chain."""
+    rng = np.random.default_rng(seed)
+    n = int(seconds * sr)
+    spec = np.fft.rfft(rng.standard_normal(n))
+    spec[np.fft.rfftfreq(n, 1 / sr) > cutoff_hz] = 0
+    wav = np.fft.irfft(spec, n)
+    return wav / (np.abs(wav).max() + 1e-9) * 0.5
+
+
+def test_spectral_rolloff_tracks_the_cutoff():
+    from aimd.data.audio import spectral_rolloff
+
+    low = spectral_rolloff(_band_limited(2.0, 4000), SR)
+    high = spectral_rolloff(_band_limited(2.0, 10000), SR)
+    assert low < 5000 < high
+
+
+def test_bandwidth_report_flags_a_mismatch(tmp_path):
+    """The case that motivated this: 16 kHz generated audio against 48 kHz real
+    audio. A detector separating those reads the codec chain, not the generator,
+    and the metrics look excellent while measuring nothing."""
+    import pandas as pd
+
+    from aimd.data.audio import bandwidth_report
+
+    rows = []
+    for i in range(6):
+        for label, cutoff in ((0, 11000), (1, 7000)):  # real wideband, fake band-limited
+            p = tmp_path / f"{label}_{i}.wav"
+            _write(p, _band_limited(2.0, cutoff, seed=i * 2 + label))
+            rows.append({"path": str(p), "label": label})
+
+    report = bandwidth_report(pd.DataFrame(rows), n_per_class=6, seconds=1.5)
+    assert report["suspicious"] is True
+    assert report["ratio"] > 1.15
+    assert report["real_rolloff_hz"] > report["fake_rolloff_hz"]
+
+
+def test_bandwidth_report_passes_matched_classes(tmp_path):
+    import pandas as pd
+
+    from aimd.data.audio import bandwidth_report
+
+    rows = []
+    for i in range(6):
+        for label in (0, 1):
+            p = tmp_path / f"{label}_{i}.wav"
+            _write(p, _band_limited(2.0, 9000, seed=i * 2 + label))
+            rows.append({"path": str(p), "label": label})
+
+    report = bandwidth_report(pd.DataFrame(rows), n_per_class=6, seconds=1.5)
+    assert report["suspicious"] is False
+
+
+def test_bandwidth_report_handles_a_missing_class(tmp_path):
+    """A manifest with no real class (FakeMusicCaps alone) must not crash."""
+    import pandas as pd
+
+    from aimd.data.audio import bandwidth_report
+
+    p = tmp_path / "only_fake.wav"
+    _write(p, _band_limited(2.0, 8000))
+    report = bandwidth_report(pd.DataFrame([{"path": str(p), "label": 1}]), n_per_class=2)
+    assert "ratio" not in report

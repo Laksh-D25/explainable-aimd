@@ -46,6 +46,49 @@ Progress lives in `~/sonics/fetch_state.jsonl`, written per song. Coverage is
 printed at the end; put that number in the write-up, because the missing songs
 are not a random sample.
 
+## 1b. YouTube's rate limiter
+
+A real 4,000-song run went 1,597 successes with **zero** refusals for 32
+minutes, then stopped dead: from t+40m onward every request was refused. That is
+rate limiting, not bad videos — re-requesting the same IDs hours later, they all
+worked.
+
+Two things follow:
+
+* **Expect ~1,500–1,600 songs per session** at 8 workers. The limiter is
+  IP-level and expires in a few hours; the fetcher marks those songs
+  `throttled`, which is *retryable*, and picks them up on the next run.
+* **Pace the requests to get further.** The defaults are now 4 workers and
+  `--sleep-requests 1`. If you still hit it:
+
+```bash
+../.venv/bin/python scripts/fetch_real_songs.py ... --workers 2 --sleep-requests 3
+```
+
+Or authenticate, which raises the limits substantially:
+
+```bash
+../.venv/bin/python scripts/fetch_real_songs.py ... --cookies-from-browser firefox
+```
+
+The run now stops itself after 25 consecutive refusals rather than burning
+through the rest of the queue — the first run wasted 1,782 attempts in five
+minutes learning nothing. Exit code 75 means "rate limited, come back later".
+
+### If you ran the earlier version
+
+It recorded rate-limited songs as `blocked` and treated that as **permanent**,
+so resuming would skip them forever — 45% of the fetch, silently. Repair the
+state file once:
+
+```bash
+../.venv/bin/python scripts/repair_fetch_state.py --state ~/sonics/fetch_state.jsonl
+```
+
+It backs up the original and drops the `blocked` entries so they are retried.
+Anything genuinely region-blocked is re-detected as `geo_blocked` next time and
+then correctly skipped.
+
 ## 2. Connect Drive (once)
 
 ```bash

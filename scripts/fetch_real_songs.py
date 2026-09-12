@@ -93,11 +93,40 @@ def check_yt_dlp(binary: str) -> str:
     return version
 
 #: Retrying these on every resume would waste hours for no chance of success.
-PERMANENT = {"private", "removed", "unavailable", "blocked", "age_restricted", "too_short"}
-#: These are worth another attempt on the next run.
-TRANSIENT = {"timeout", "failed", "network"}
+PERMANENT = {"private", "removed", "unavailable", "age_restricted", "too_short", "geo_blocked"}
+#: Worth another attempt on the next run. `throttled` belongs here and the
+#: distinction is not academic: a 4,000-song run hit YouTube's rate limiter at
+#: ~1,600 downloads and the remaining 1,799 were all refused. Classing those as
+#: permanent would silently discard 45% of the dataset for a block that expires
+#: within hours -- verified by re-requesting them later, when all succeeded.
+TRANSIENT = {"timeout", "failed", "network", "throttled"}
 
 _stop = threading.Event()
+_throttled = threading.Event()
+
+#: Consecutive throttle responses before the run gives up. Once YouTube starts
+#: refusing, every subsequent request is refused too -- the previous run churned
+#: through 1,782 IDs in five minutes, learning nothing and filling the state file
+#: with failures. Stopping early keeps the state clean and the queue intact.
+THROTTLE_STREAK_LIMIT = 25
+
+
+class ThrottleDetector:
+    """Trips once throttle responses arrive back-to-back."""
+
+    def __init__(self, limit: int = THROTTLE_STREAK_LIMIT):
+        self.limit = limit
+        self.streak = 0
+        self.lock = threading.Lock()
+
+    def record(self, status: str) -> bool:
+        """Returns True when the breaker trips."""
+        with self.lock:
+            if status == "throttled":
+                self.streak += 1
+            elif status == "ok":
+                self.streak = 0  # only a success clears it
+            return self.streak >= self.limit
 
 
 def _probe_duration(path: Path) -> float | None:
@@ -160,12 +189,34 @@ class State:
         return status in PERMANENT and not retry_failed
 
 
+#: Rate-limiting. Transient, IP-level, and it expires.
+THROTTLE_MARKERS = (
+    "sign in to confirm you're not a bot",
+    "sign in to confirm that you're not a bot",
+    "too many requests",
+    "http error 429",
+    "confirm you're not a bot",
+)
+#: Genuinely unavailable to this region. Retrying will not help.
+GEO_MARKERS = ("not available in your country", "blocked it in your country",
+               "geo restricted", "geo-restricted")
+
+
 def classify_error(stderr: bytes) -> str:
+    """Map yt-dlp's stderr to a status, distinguishing throttle from refusal.
+
+    Throttling is checked first and deliberately: its message often also
+    contains the word "sign in", which an age-restriction rule would otherwise
+    claim, turning a retryable block into a permanent one.
+    """
     err = (stderr or b"").decode(errors="replace").lower()
+    if any(m in err for m in THROTTLE_MARKERS):
+        return "throttled"
+    if any(m in err for m in GEO_MARKERS):
+        return "geo_blocked"
     for marker, status in [
-        ("private", "private"), ("removed", "removed"), ("unavailable", "unavailable"),
-        ("blocked", "blocked"), ("not available in your country", "blocked"),
-        ("age", "age_restricted"), ("sign in to confirm", "blocked"),
+        ("private", "private"), ("removed", "removed"),
+        ("unavailable", "unavailable"), ("age", "age_restricted"),
     ]:
         if marker in err:
             return status
@@ -173,7 +224,8 @@ def classify_error(stderr: bytes) -> str:
 
 
 def fetch_one(row: dict, out_dir: Path, bitrate: str, timeout: int,
-              yt_dlp: str = "yt-dlp") -> tuple[str, str]:
+              yt_dlp: str = "yt-dlp", sleep_requests: float = 0.0,
+              cookies_from_browser: str | None = None) -> tuple[str, str]:
     name = str(row["filename"])
     target = out_dir / f"{name}.mp3"
     expected = float(row.get("duration") or 0.0)
@@ -192,6 +244,12 @@ def fetch_one(row: dict, out_dir: Path, bitrate: str, timeout: int,
         "--audio-quality", bitrate,
         "-o", str(out_dir / f"{name}.%(ext)s"),
     ]
+    if sleep_requests:
+        # Pace requests so the rate limiter is not tripped in the first place.
+        cmd += ["--sleep-requests", str(sleep_requests)]
+    if cookies_from_browser:
+        # A signed-in session gets substantially higher limits.
+        cmd += ["--cookies-from-browser", cookies_from_browser]
     if expected > 0:
         cmd += ["--download-sections", f"*{start:.2f}-{start + expected:.2f}",
                 "--force-keyframes-at-cuts"]
@@ -244,11 +302,17 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--csv", type=Path, required=True, help="SONICS real_songs.csv")
     ap.add_argument("--out", type=Path, required=True)
-    ap.add_argument("--workers", type=int, default=8)
+    ap.add_argument("--workers", type=int, default=4,
+                    help="4 is deliberate: 8 tripped YouTube's rate limiter "
+                         "at ~1,600 songs")
     ap.add_argument("--bitrate", default=BITRATE_MATCHING_SONICS)
     ap.add_argument("--limit", type=int, default=None, help="fetch only N (subset)")
     ap.add_argument("--split", default=None)
     ap.add_argument("--timeout", type=int, default=180)
+    ap.add_argument("--sleep-requests", type=float, default=1.0,
+                    help="seconds between yt-dlp requests; pacing avoids the rate limiter")
+    ap.add_argument("--cookies-from-browser", default=None,
+                    help="e.g. firefox|chrome|brave -- a signed-in session gets higher limits")
     ap.add_argument("--retry-failed", action="store_true",
                     help="also retry permanent failures (removed, private, blocked)")
     ap.add_argument("--shard-size", type=int, default=None)
@@ -290,17 +354,24 @@ def main() -> int:
     signal.signal(signal.SIGINT, on_signal)
     signal.signal(signal.SIGTERM, on_signal)
 
+    detector = ThrottleDetector()
     start_time = time.time()
     completed = 0
     with cf.ThreadPoolExecutor(max_workers=args.workers) as pool:
         futures = {
-            pool.submit(fetch_one, r, args.out, args.bitrate, args.timeout, yt_dlp): r
+            pool.submit(fetch_one, r, args.out, args.bitrate, args.timeout, yt_dlp,
+                        args.sleep_requests, args.cookies_from_browser): r
             for r in pending
         }
         for fut in cf.as_completed(futures):
             name, status = fut.result()
             if status != "interrupted":
                 state.record(name, status)
+            if detector.record(status) and not _throttled.is_set():
+                _throttled.set()
+                _stop.set()
+                print(f"\n  rate limited: {detector.streak} refusals in a row. Stopping so "
+                      "the rest of the queue stays untried.", flush=True)
             completed += 1
             if completed % 50 == 0 or completed == len(futures):
                 rate = completed / max(time.time() - start_time, 1e-9)
@@ -316,6 +387,17 @@ def main() -> int:
     ok = int((report["status"] == "ok").sum())
     print(f"coverage: {ok:,}/{len(rows):,} ({ok / max(len(rows), 1):.1%}) "
           "-- state this in the write-up; the missing songs are not random")
+    if _throttled.is_set():
+        print(
+            "\nStopped by YouTube's rate limiter, not by a problem with these videos.\n"
+            "  The block is IP-level and expires -- typically within a few hours.\n"
+            "  Throttled songs stay queued and are retried automatically.\n\n"
+            "  To get further per session, re-run with:\n"
+            "    --workers 2 --sleep-requests 3\n"
+            "  or authenticate for higher limits:\n"
+            "    --cookies-from-browser firefox"
+        )
+        return 75
     if _stop.is_set():
         print("stopped early -- re-run the same command to continue")
         return 130

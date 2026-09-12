@@ -103,7 +103,7 @@ def test_is_complete_accepts_a_real_clip_of_expected_length(tmp_path):
         (b"ERROR: This video is private", "private"),
         (b"ERROR: video has been removed by the uploader", "removed"),
         (b"ERROR: Sign in to confirm your age", "age_restricted"),
-        (b"ERROR: not available in your country", "blocked"),
+        (b"ERROR: not available in your country", "geo_blocked"),
         (b"ERROR: some transient network hiccup", "failed"),
         (b"", "failed"),
     ],
@@ -153,3 +153,87 @@ def test_negative_limit_is_rejected(tmp_path):
     )
     assert proc.returncode != 0
     assert "must be >= 0" in proc.stdout + proc.stderr
+
+
+# --- throttling vs permanent refusal ------------------------------------------
+
+
+def test_throttling_is_transient_not_permanent():
+    """The bug this encodes: a 4,000-song run hit YouTube's rate limiter at
+    ~1,600 downloads and the remaining 1,799 were refused. Classing those as
+    permanent would discard 45% of the dataset for a block that expires."""
+    assert "throttled" in TRANSIENT
+    assert "throttled" not in PERMANENT
+    assert "geo_blocked" in PERMANENT
+
+
+@pytest.mark.parametrize("stderr", [
+    b"ERROR: Sign in to confirm you're not a bot",
+    b"ERROR: HTTP Error 429: Too Many Requests",
+    b"ERROR: Sign in to confirm that you're not a bot. Use --cookies",
+])
+def test_rate_limit_messages_classify_as_throttled(stderr):
+    assert classify_error(stderr) == "throttled"
+
+
+def test_throttle_is_not_mistaken_for_age_restriction():
+    """The throttle message contains "sign in", which an age rule would
+    otherwise claim -- turning a retryable block into a permanent one."""
+    assert classify_error(b"Sign in to confirm you're not a bot") == "throttled"
+    assert classify_error(b"Sign in to confirm your age") == "age_restricted"
+
+
+def test_region_block_stays_permanent():
+    assert classify_error(b"ERROR: Video not available in your country") == "geo_blocked"
+
+
+def test_throttled_songs_are_retried_on_resume(tmp_path):
+    state = State(tmp_path / "s.jsonl")
+    state.record("real_1", "throttled")
+    assert not state.should_skip("real_1", retry_failed=False)
+
+
+def test_detector_trips_only_on_a_consecutive_streak():
+    from fetch_real_songs import ThrottleDetector
+
+    det = ThrottleDetector(limit=3)
+    assert not det.record("throttled")
+    assert not det.record("throttled")
+    det.record("ok")                      # a success clears the streak
+    assert not det.record("throttled")
+    assert not det.record("throttled")
+    assert det.record("throttled")        # three in a row
+
+
+def test_detector_streak_survives_unrelated_failures():
+    """Once throttling starts, other failures interleave; only a real success
+    means the limiter has let go."""
+    from fetch_real_songs import ThrottleDetector
+
+    det = ThrottleDetector(limit=3)
+    det.record("throttled")
+    det.record("unavailable")   # not a success, so the streak stands
+    det.record("throttled")
+    assert det.record("throttled")
+
+
+def test_repair_tool_makes_blocked_entries_retryable(tmp_path):
+    """The recovery path for state files written by the buggy version."""
+    import json as _json
+    import subprocess
+
+    state = tmp_path / "fetch_state.jsonl"
+    with state.open("w") as fh:
+        for i in range(5):
+            fh.write(_json.dumps({"filename": f"r{i}", "status": "blocked"}) + "\n")
+        fh.write(_json.dumps({"filename": "keep", "status": "ok"}) + "\n")
+
+    script = Path(__file__).resolve().parents[1] / "scripts" / "repair_fetch_state.py"
+    proc = subprocess.run([sys.executable, str(script), "--state", str(state)],
+                          capture_output=True, text=True, timeout=60)
+    assert proc.returncode == 0, proc.stdout + proc.stderr
+
+    restored = State(state)
+    assert restored.entries == {"keep": "ok"}          # blocked entries gone
+    assert not restored.should_skip("r0", False)       # so they get retried
+    assert state.with_suffix(".jsonl.bak").exists()    # original preserved

@@ -73,17 +73,24 @@ def main() -> int:
         n = min(counts.get(0, 0), counts.get(1, 0))
         if n == 0:
             raise SystemExit("one class has no audio; cannot balance or train")
-        have = (
-            have.groupby("label", group_keys=False)
-            .apply(lambda g: g.sample(n=n, random_state=args.seed), include_groups=True)
-            .reset_index(drop=True)
+        have = pd.concat(
+            [g.sample(n=n, random_state=args.seed) for _, g in have.groupby("label")],
+            ignore_index=True,
         )
         print(f"balanced : {n:,} per class ({len(have):,} total)")
 
     # Splits are inherited from SONICS, but a subsample can empty one. Re-split
     # only when that happens, and say so, because it breaks comparability.
+    # A subsample of the official splits can leave a split too small, or with one
+    # class barely present -- calibration and model selection then run on noise.
+    # Re-splitting costs comparability with SONICS's published F1, but that was
+    # already lost by subsampling, whereas a 14-song validation set is simply
+    # unusable.
     per_split = have["split"].value_counts()
-    if len(per_split) < 3 or per_split.min() < 4:
+    per_class = have.groupby(["split", "label"]).size().unstack(fill_value=0)
+    too_small = len(per_split) < 3 or per_split.min() < 30
+    too_skewed = per_class.min().min() < 10 if not per_class.empty else True
+    if too_small or too_skewed:
         print("  NOTE: official splits left a split too small after subsampling; "
               "re-splitting by song. In-distribution numbers are no longer "
               "directly comparable to the SONICS paper.")

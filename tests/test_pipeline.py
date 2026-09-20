@@ -77,6 +77,10 @@ def test_checkpoint_round_trip_reproduces_predictions(stub_backbone, corpus, con
     torch.manual_seed(0)
     trained = Detector(backbone=stub_backbone)
     train_model(trained, corpus, config, checkpoint_dir=tmp_path, log=lambda *_: None)
+    # Reload into the trained model too: the checkpoint holds the *best* epoch,
+    # which is not necessarily the last, so comparing against the end-of-training
+    # weights would test epoch selection rather than the round-trip.
+    load_checkpoint(trained, tmp_path / "best.pt")
     trained.eval()
 
     torch.manual_seed(999)  # different init

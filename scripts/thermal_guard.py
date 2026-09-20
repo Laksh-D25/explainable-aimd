@@ -115,6 +115,8 @@ def main() -> int:
                     help="resume below this temp; the gap prevents thrashing")
     ap.add_argument("--interval", type=float, default=2.0)
     ap.add_argument("--log", type=Path, default=None)
+    ap.add_argument("--wait", action="store_true",
+                    help="keep running when nothing matches, for unattended pipelines")
     args = ap.parse_args()
 
     if args.resume_at >= args.pause_at:
@@ -123,6 +125,7 @@ def main() -> int:
     sensor = find_sensor()
     exclude = {os.getpid(), os.getppid()}
     paused = False
+    waiting = False
     pauses = 0
     stalled = 0.0
     start = time.time()
@@ -155,8 +158,15 @@ def main() -> int:
         if not pids:
             if paused:
                 paused = False  # the workload exited while paused
-            emit(f"no matching process (cpu {temp:.0f}C) — exiting")
-            return 0
+            if not args.wait:
+                emit(f"no matching process (cpu {temp:.0f}C) — exiting")
+                return 0
+            if not waiting:
+                emit(f"no matching process (cpu {temp:.0f}C) — waiting")
+                waiting = True
+            time.sleep(args.interval)
+            continue
+        waiting = False
 
         if not paused and temp >= args.pause_at:
             n = signal_all(pids, signal.SIGSTOP)

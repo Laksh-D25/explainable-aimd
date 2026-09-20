@@ -86,6 +86,53 @@ def segment(
     return clips
 
 
+def rms_normalize(wav: np.ndarray, target_rms: float = 0.05,
+                  max_gain: float = 20.0) -> np.ndarray:
+    """Scale to a fixed RMS (loudness) rather than a fixed peak.
+
+    Peak normalisation leaves a large shortcut in this task: commercial music is
+    mastered loud and heavily compressed, while generated tracks are not, so RMS
+    alone separates the classes at 0.81 AUROC even after peak normalisation. A
+    detector will take that cue, and its score then reflects mastering practice
+    rather than synthesis artefacts.
+
+    Gain is capped so a near-silent clip is not amplified into noise.
+    """
+    rms = float(np.sqrt(np.mean(wav.astype(np.float64) ** 2)))
+    if rms < 1e-8:
+        return wav.astype(np.float32)
+    gain = min(target_rms / rms, max_gain)
+    out = wav * gain
+    # Re-limit rather than clip hard: a scaled-up loud track can exceed 1.0.
+    peak = np.abs(out).max()
+    if peak > 0.99:
+        out = out * (0.99 / peak)
+    return out.astype(np.float32)
+
+
+def randomize_dynamics(wav: np.ndarray, rng: np.random.Generator | None = None,
+                       low: float = 0.55, high: float = 1.45) -> np.ndarray:
+    """Randomise dynamic range, then restore loudness.
+
+    Crest factor (peak / RMS) separates the classes at 0.81 AUROC and survives
+    every amplitude normalisation, because it is scale-invariant: commercial
+    releases are limited and compressed, generated tracks are not. A detector
+    will read mastering practice instead of synthesis artefacts.
+
+    Applying `sign(x) * |x| ** gamma` with a random gamma compresses (gamma < 1)
+    or expands (gamma > 1) the range, so the cue is smeared across both classes
+    rather than tracking the label. RMS is restored afterwards so the transform
+    does not reintroduce a loudness difference.
+
+    Applied to *both* classes and to eval as well as train: the goal is to
+    remove a confound from the task, not to augment one split.
+    """
+    rng = rng or np.random.default_rng()
+    gamma = float(rng.uniform(low, high))
+    shaped = np.sign(wav) * np.abs(wav) ** gamma
+    return rms_normalize(shaped)
+
+
 def fit_length(wav: np.ndarray, n_samples: int) -> np.ndarray:
     """Trim or zero-pad to exactly `n_samples`.
 

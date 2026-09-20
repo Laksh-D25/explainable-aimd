@@ -23,7 +23,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 
-from .audio import fit_length, load_audio, pad_clips, peak_normalize, segment
+from .audio import fit_length, load_audio, pad_clips, rms_normalize, segment
 from .perturb import Perturbation, TrainAugment
 
 
@@ -96,7 +96,9 @@ class SongClipsDataset(Dataset):
         spec = self.spec
         rng = self._rng(index)
 
-        wav = peak_normalize(load_audio(row["path"], spec.sample_rate))
+        # RMS rather than peak: peak normalisation leaves an 0.81-AUROC
+        # loudness shortcut between mastered and generated audio.
+        wav = rms_normalize(load_audio(row["path"], spec.sample_rate))
         clips = segment(
             wav,
             clip_seconds=spec.clip_seconds,

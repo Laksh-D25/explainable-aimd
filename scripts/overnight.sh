@@ -25,8 +25,12 @@ while [ "$(date +%s)" -lt "$DEADLINE" ]; do
   MC=$(ls $S/fmc/real 2>/dev/null | grep -c '\.wav$')
   FMC=$(find $S/fmc/generated -name '*.wav' 2>/dev/null | wc -l)
   echo "  real=$R fake=$F musiccaps=$MC fakemusiccaps=$FMC  $(date +%H:%M:%S)"
-  # Enough for a materially bigger in-distribution set and a usable cross-gen set.
-  [ "$R" -ge 1200 ] && [ "$F" -ge 1200 ] && [ "$MC" -ge 350 ] && [ "$FMC" -ge 600 ] && break
+  # Gate only on the SONICS data the main experiment needs. The cross-generator
+  # fetch runs last and keeps downloading in the background: FakeMusicCaps has
+  # no range support, so reaching each successive generator means streaming
+  # past every byte of the previous one, and blocking on it here would stall
+  # the whole run for hours.
+  [ "$R" -ge 700 ] && [ "$F" -ge 700 ] && break
   sleep 120
 done
 
@@ -52,8 +56,12 @@ $PY -u scripts/diagnose_shortcut.py --manifest $S/manifest_big_cached.csv \
 
 # ------------------------------------------------------------------- 5. train + eval
 say "training + in-distribution + robustness + explanations + figures"
+# batch 2, not 4: at batch 4 training held 3.0 GB of 3.75 GB and starved the
+# desktop compositor badly enough to need `systemctl restart lightdm`. The VRAM
+# cap in aimd.pipeline turns that freeze into an ordinary OOM, and batch 2 stays
+# under it comfortably.
 $PY -u scripts/run_experiment.py --manifest $S/manifest_big_cached.csv \
-    --out artifacts/run2 --epochs 20 --batch-size 4 \
+    --out artifacts/run2 --epochs 20 --batch-size 2 \
     --clip-seconds 5 --clips-per-song 4 --explain-songs 16 \
     2>&1 | grep -vE "UserWarning|warnings.warn|torchaudio|StreamReader|torchcodec|^  s = |run_backward"
 

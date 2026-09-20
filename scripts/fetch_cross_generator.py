@@ -104,23 +104,31 @@ def fetch_musiccaps(out: Path, n: int) -> int:
     files.sort()
     print(f"  musiccaps: {len(files)} available, taking {n}", flush=True)
 
-    got = len(list(out.glob("*.wav")))
-    for i, name in enumerate(files):
-        if got >= n:
-            break
-        target = out / Path(name).name
-        if target.exists() and target.stat().st_size > 4096:
-            continue
+    have = {f.name for f in out.glob("*.wav")}
+    wanted = [f for f in files if Path(f).name not in have][: max(0, n - len(have))]
+    if not wanted:
+        print(f"  musiccaps already have {len(have)}", flush=True)
+        return len(have)
+
+    # Sequential hf_hub_download managed ~1.25 files/min: per-file request
+    # overhead dominates a 5 MB transfer. Fetching in parallel turns a
+    # five-hour download into minutes.
+    import concurrent.futures as cf
+
+    def grab(name: str) -> bool:
         try:
-            path = hf_hub_download(MUSICCAPS_REPO, name, repo_type="dataset",
-                                   local_dir=str(out.parent / "_mc_cache"))
-            target.write_bytes(Path(path).read_bytes())
-            Path(path).unlink(missing_ok=True)
-            got += 1
-            if got % 25 == 0:
+            path = hf_hub_download(MUSICCAPS_REPO, name, repo_type="dataset")
+            (out / Path(name).name).write_bytes(Path(path).read_bytes())
+            return True
+        except Exception:
+            return False
+
+    got = len(have)
+    with cf.ThreadPoolExecutor(max_workers=8) as pool:
+        for i, ok in enumerate(pool.map(grab, wanted), 1):
+            got += ok
+            if i % 25 == 0:
                 print(f"  musiccaps {got}/{n}", flush=True)
-        except Exception as exc:
-            print(f"  musiccaps skip {name}: {type(exc).__name__}", flush=True)
     print(f"  musiccaps done: {got}", flush=True)
     return got
 

@@ -55,13 +55,37 @@ class TrainConfig:
         )
 
 
+#: Leave this much VRAM for the desktop. The RTX 3050 drives both the display
+#: and the workload; training at 3.0 GB of 3.75 GB starved the compositor and
+#: froze the session hard enough to need `systemctl restart lightdm`.
+DISPLAY_VRAM_RESERVE_GB = 1.3
+
+
 def resolve_device(requested: str = "auto") -> str:
     if requested != "auto":
         return requested
     return "cuda" if torch.cuda.is_available() else "cpu"
 
 
+def cap_vram(device: str, reserve_gb: float = DISPLAY_VRAM_RESERVE_GB) -> None:
+    """Bound this process's VRAM so the display server keeps working.
+
+    Without a cap PyTorch will happily grow its cache until the compositor
+    cannot allocate, at which point the desktop locks up rather than raising an
+    error anyone can see. A hard fraction turns that silent freeze into an
+    ordinary OutOfMemoryError, which is recoverable and debuggable.
+    """
+    if not device.startswith("cuda"):
+        return
+    total = torch.cuda.get_device_properties(0).total_memory / 1024**3
+    fraction = max(0.35, min(0.85, (total - reserve_gb) / total))
+    torch.cuda.set_per_process_memory_fraction(fraction)
+    print(f"  vram capped at {fraction:.0%} of {total:.2f} GB "
+          f"(~{reserve_gb:.1f} GB reserved for the display)", flush=True)
+
+
 def build_model(device: str, model_name: str = "m-a-p/MERT-v1-95M", **kwargs) -> Detector:
+    cap_vram(device)
     return Detector(backbone=MertBackbone(model_name=model_name), **kwargs).to(device)
 
 

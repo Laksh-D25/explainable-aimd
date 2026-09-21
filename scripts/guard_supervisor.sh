@@ -14,7 +14,13 @@
 PY=/home/laksh/Downloads/rmml/.venv/bin/python
 GUARD=/home/laksh/Downloads/rmml/code/scripts/thermal_guard.py
 LOG=/home/laksh/sonics/thermal_guard.log
-MATCH='run_experiment|finish_experiment|stream_fetch|fetch_real|build_clip|match_bitrate|cross_generator|diagnose_shortcut'
+# Match any script in this repo rather than an enumerated list. The list went
+# stale the moment a new script was added -- generator_split_eval.py ran
+# unguarded at 97 C against a 98 C trip because it was not named here.
+#
+# Matched on the *relative* path, because that is how the scripts are invoked:
+# an absolute-path pattern matched nothing and left the workload unguarded.
+MATCH='scripts/[a-z_]+\.py'
 
 restarts=0
 while true; do

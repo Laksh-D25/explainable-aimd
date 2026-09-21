@@ -90,3 +90,37 @@ def test_threshold_honours_a_false_positive_budget():
     realised_fpr = (probs[labels == 0] >= threshold).mean()
     assert realised_fpr <= 0.02, f"FPR budget 1% breached: {realised_fpr:.3f}"
     assert threshold > 0.5, "a 1% FPR budget should demand more than a coin flip"
+
+
+def test_separable_validation_gets_a_margin_midpoint_threshold():
+    """The failure this prevents: with perfect validation separation, the
+    FPR-quantile threshold sits right against the real class. On unseen
+    generators everything then crosses it -- FPR 1.00, and an F1 identical to a
+    trivial all-positive baseline."""
+    labels = np.array([0] * 50 + [1] * 50)
+    logits = np.concatenate([np.full(50, -8.0), np.full(50, 8.0)])  # clean margin
+
+    t = threshold_for_target_fpr(logits, labels, target_fpr=0.05)
+    probs = 1 / (1 + np.exp(-logits))
+    assert probs[:50].max() < t < probs[50:].min(), "threshold must sit inside the margin"
+    assert t == pytest.approx((probs[:50].max() + probs[50:].min()) / 2)
+
+
+def test_separable_threshold_survives_a_shift_that_breaks_the_quantile():
+    """A modest shift toward 'fake' should not flip every real song."""
+    labels = np.array([0] * 50 + [1] * 50)
+    logits = np.concatenate([np.full(50, -8.0), np.full(50, 8.0)])
+    t = threshold_for_target_fpr(logits, labels, target_fpr=0.05)
+
+    # New data where real scores drifted upward but stay well below the margin.
+    shifted_real = 1 / (1 + np.exp(-np.full(50, -4.0)))
+    assert (shifted_real < t).all(), "midpoint threshold should still reject these"
+
+
+def test_overlapping_validation_still_uses_the_fpr_budget():
+    rng = np.random.default_rng(0)
+    labels = rng.integers(0, 2, size=2000)
+    logits = labels * 1.5 + rng.normal(0, 1.0, size=2000)  # overlapping
+    t = threshold_for_target_fpr(logits, labels, target_fpr=0.05)
+    probs = 1 / (1 + np.exp(-logits))
+    assert (probs[labels == 0] >= t).mean() <= 0.08

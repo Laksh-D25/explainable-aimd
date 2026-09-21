@@ -55,17 +55,34 @@ class TemperatureScaler:
 def threshold_for_target_fpr(
     logits: np.ndarray, labels: np.ndarray, target_fpr: float = 0.01, scaler=None
 ) -> float:
-    """Lowest probability threshold whose false-positive rate is <= target.
+    """Operating point chosen against a false-positive budget.
 
-    The operating point should be chosen against a false-positive budget rather
-    than left at 0.5: the cost of wrongly flagging a human artist's track is not
-    symmetric with the cost of missing an AI-generated one.
+    The cost of wrongly flagging a human artist's track is not symmetric with
+    the cost of missing an AI-generated one, so the threshold comes from an FPR
+    budget rather than sitting at 0.5.
+
+    **Perfect separation needs different handling.** When validation separates
+    completely -- which it does here, at F1 1.000 -- every real score sits near
+    zero, so the (1 - target) quantile of them is also near zero. That threshold
+    is technically valid on validation and catastrophic anywhere else: applied
+    to unseen generators it labelled *everything* fake (FPR 1.00), producing an
+    F1 identical to a trivial all-positive baseline.
+
+    With a clean margin, any threshold inside it scores identically on
+    validation, so the quantile is an arbitrary pick from a wide interval. The
+    midpoint of the margin is the robust choice: it is the point furthest from
+    both classes, and therefore the one most likely to survive a distribution
+    shift.
     """
     probs = scaler.transform(logits) if scaler is not None else 1 / (1 + np.exp(-logits))
     labels = np.asarray(labels).astype(int)
-    real = probs[labels == 0]
+    real, fake = probs[labels == 0], probs[labels == 1]
     if len(real) == 0:
         return 0.5
-    # The (1 - target) quantile of scores on real songs is the threshold that
-    # leaves at most `target` of them above it.
+
+    if len(fake) and real.max() < fake.min():
+        # Separable: sit in the middle of the gap rather than hard against the
+        # real class, where any shift pushes every sample across the boundary.
+        return float((real.max() + fake.min()) / 2)
+
     return float(np.quantile(real, 1.0 - target_fpr))

@@ -140,6 +140,11 @@ def main() -> int:
             "layers_last": {"layer_mode": "last"},
             "song_mean": {"song_pool": "mean"},
         }
+        # Two backbones do not fit under the display-safe VRAM cap, and the
+        # trained model is not needed again until the explanations below.
+        model.to("cpu")
+        if device.startswith("cuda"):
+            torch.cuda.empty_cache()
         for name, overrides in variants.items():
             torch.manual_seed(1337)
             m = build_model(device, **overrides)
@@ -154,6 +159,7 @@ def main() -> int:
                 torch.cuda.empty_cache()
         ablations = pd.DataFrame(rows).set_index("ablation")
         ablations.to_csv(args.out / "ablations.csv")
+        model.to(device)
 
     log("\n=== explanations ===")
     model.eval()

@@ -90,6 +90,21 @@ def matching_pids(pattern: str, exclude: set[int]) -> list[int]:
     return pids
 
 
+def is_stopped(pid: int) -> bool:
+    """True if the process is sitting in SIGSTOP.
+
+    A guard that is killed while the workload is paused leaves it paused
+    forever, and the supervisor's replacement has no memory of what it stopped.
+    Reading the state back from /proc is what lets the replacement clean up.
+    """
+    try:
+        stat = Path(f"/proc/{pid}/stat").read_text()
+    except OSError:
+        return False
+    # The command field can contain spaces and parentheses; state follows it.
+    return stat.rpartition(")")[2].split()[0] in {"T", "t"}
+
+
 def signal_all(pids: list[int], sig: signal.Signals) -> int:
     sent = 0
     for pid in pids:
@@ -141,9 +156,10 @@ def main() -> int:
          f"resume at {args.resume_at:.0f}C, sensor {sensor}")
 
     def shutdown(_sig, _frame):
-        if paused:
-            signal_all(matching_pids(args.match, exclude), signal.SIGCONT)
-            emit("resumed workload before exiting")
+        held = [p for p in matching_pids(args.match, exclude) if is_stopped(p)]
+        if held:
+            signal_all(held, signal.SIGCONT)
+            emit(f"resumed {len(held)} process(es) before exiting")
         emit(f"stopped after {pauses} pauses, {stalled:.0f}s stalled")
         raise SystemExit(0)
 
@@ -157,7 +173,7 @@ def main() -> int:
 
         if not pids:
             if paused:
-                paused = False  # the workload exited while paused
+                paused, pause_began = False, 0.0  # the workload exited while paused
             if not args.wait:
                 emit(f"no matching process (cpu {temp:.0f}C) — exiting")
                 return 0
@@ -168,16 +184,31 @@ def main() -> int:
             continue
         waiting = False
 
-        if not paused and temp >= args.pause_at:
-            n = signal_all(pids, signal.SIGSTOP)
-            paused, pauses, pause_began = True, pauses + 1, time.time()
-            emit(f"cpu {temp:.1f}C >= {args.pause_at:.0f}C — paused {n} process(es)")
-        elif paused and temp <= args.resume_at:
-            n = signal_all(pids, signal.SIGCONT)
-            stalled += time.time() - pause_began
-            paused = False
-            emit(f"cpu {temp:.1f}C <= {args.resume_at:.0f}C — resumed {n} process(es) "
-                 f"(stalled {time.time() - pause_began:.0f}s)")
+        if temp >= args.pause_at:
+            # Pause on every hot poll, not only on the transition into the hot
+            # state. A job that starts while the guard is already holding the
+            # workload would otherwise run completely unguarded, and because it
+            # keeps the die hot the guard never cools back down to notice it --
+            # which is exactly how this machine spent 88 minutes at 92C with
+            # every process it knew about frozen.
+            fresh = [pid for pid in pids if not is_stopped(pid)]
+            if fresh:
+                n = signal_all(fresh, signal.SIGSTOP)
+                if not paused:
+                    paused, pause_began = True, time.time()
+                pauses += 1
+                emit(f"cpu {temp:.1f}C >= {args.pause_at:.0f}C — paused {n} process(es)")
+        elif temp <= args.resume_at:
+            # Resume by observed state rather than by what this guard stopped,
+            # so a replacement guard cleans up after the one it replaced.
+            held = [pid for pid in pids if is_stopped(pid)]
+            if held:
+                n = signal_all(held, signal.SIGCONT)
+                began = pause_began or time.time()
+                stalled += time.time() - began
+                emit(f"cpu {temp:.1f}C <= {args.resume_at:.0f}C — resumed {n} process(es) "
+                     f"(stalled {time.time() - began:.0f}s)")
+            paused, pause_began = False, 0.0
 
         time.sleep(args.interval)
 

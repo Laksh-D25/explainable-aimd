@@ -47,16 +47,16 @@ figure.
 
 \subsection{Three evaluation axes}
 
-\paragraph{In-distribution.}
+\paragraph{In-distribution}
 Held-out songs, same generators, same corpus. A sanity number.
 
-\paragraph{Cross-generator, shared corpus.}
+\paragraph{Cross-generator, shared corpus}
 SONICS contains both Suno and Udio. Training on one and testing on the other
 isolates the generator: corpus, pipeline, processing and real class are all held
 fixed. Real songs are divided disjointly between the halves, and both directions
 are run because transfer is not symmetric in general.
 
-\paragraph{Cross-corpus.}
+\paragraph{Cross-corpus}
 FakeMusicCaps pairs five unseen text-to-music generators with real music from
 MusicCaps. Here the generator \emph{and} the corpus of real music change
 together. We band-limit the real clips to the generated set's sample rate and

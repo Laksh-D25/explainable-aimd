@@ -1,26 +1,26 @@
 \section{Limitations}
 \label{sec:limitations}
 
-\paragraph{The in-distribution figure is saturated.}
+\paragraph{The in-distribution figure is saturated}
 Validation $F_1$ reaches 1.000 at the first epoch and does not move. The
 in-distribution result is therefore a ceiling, and the collapses we report are
 measured from it. It should not be read as evidence that the architecture is
 well matched to the task.
 
-\paragraph{Scale.}
+\paragraph{Scale}
 The corpus is 910 songs against SONICS's 97{,}164. The real class was fetched
 from source identifiers at roughly 85\% coverage, with losses concentrated in
 removed, private and region-restricted recordings, so it is not a random sample.
 Splits were regenerated after subsampling, so the in-distribution figure is not
 directly comparable to SONICS's published results.
 
-\paragraph{Suno and Udio are a close pair.}
+\paragraph{Suno and Udio are a close pair}
 Both are commercial end-to-end song generators. Near-complete transfer between
 them is weaker evidence of generator-independence than transfer between
 architecturally distinct families would be, and should not be read as
 generalisation to arbitrary generators.
 
-\paragraph{Corpus and generator are confounded in the cross-corpus arm.}
+\paragraph{Corpus and generator are confounded in the cross-corpus arm}
 FakeMusicCaps changes the corpus, sample rate and clip length together with the
 generator. We band-limit and verify bandwidth before reporting, and the FPR of
 1.00 on real music localises the failure to the real class specifically, but
@@ -28,11 +28,11 @@ isolating the corpus effect cleanly would require a shared real corpus across
 both generator families. We regard this as the most important piece of future
 work.
 
-\paragraph{The explanation audit is small.}
-Twelve songs, balanced by class. The separation is complete---6/6 against
-0/6---but the sample is small enough that the effect size, not merely its
-direction, needs confirmation at scale.
+\paragraph{The explanation audit is small}
+Twelve songs, balanced by class. The separation is complete (6/6 against 0/6),
+but the sample is small enough that the effect size, not merely its direction,
+needs confirmation at scale.
 
-\paragraph{Single seed.}
+\paragraph{Single seed}
 Results are from one training run per configuration. Variance across seeds is
 unmeasured.

@@ -22,10 +22,15 @@ Reporting the all-positive baseline and the false-positive rate alongside $F_1$
 would have made the failure visible at a glance, and we recommend both as
 routine practice.
 
-Finally, gradient-based temporal explanation proved faithful for real audio and
+Finally, the explanation layer produced two negative results worth carrying
+forward. Gradient-based temporal explanation proved faithful for real audio and
 unfaithful for generated audio, indicating that the evidence for synthesis is
 not localised in time and that frequency-resolved explanation is the appropriate
-tool.
+tool. And the model's own layer-attention weights---the explanation an
+attention-pooling architecture supplies for free---are flat, and their ordering
+is negatively rank-correlated with exact Shapley attribution over the same
+layers in every song we audited. Architectural attention should be reported as a
+property of the architecture, not as an account of the decision.
 
 The immediate next step is an evaluation in which two architecturally distinct
 generator families are paired with a \emph{shared} corpus of real music, which

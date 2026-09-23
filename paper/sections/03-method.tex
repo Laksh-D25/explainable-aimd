@@ -8,19 +8,19 @@ Audio is resampled to \SI{24}{\kilo\hertz} mono and segmented into fixed clips;
 MERT returns thirteen hidden states per clip at \SI{74.8}{\hertz}, each of
 dimension 768. The head aggregates these in three stages.
 
-\paragraph{Per-layer normalisation.}
+\paragraph{Per-layer normalisation}
 The thirteen states already share a shape, but differ substantially in scale.
 Without normalisation the layer-attention softmax tracks magnitude rather than
 informativeness, so each state is passed through its own layer normalisation
 before weighting.
 
-\paragraph{Layer attention.}
+\paragraph{Layer attention}
 A learned scalar per layer, softmax-normalised, produces a weighted sum over
 depth. Learning one global profile rather than a per-example weighting keeps the
 weights readable as an explanation: they state which depths the detector relies
 on in general.
 
-\paragraph{Temporal and clip pooling.}
+\paragraph{Temporal and clip pooling}
 Additive attention pools frames within a clip, and a second attention stage
 pools clips within a song. The second stage is necessary rather than
 decorative. SONICS songs run \SIrange{32}{240}{\second}, MERT was pre-trained on
@@ -30,8 +30,8 @@ exceeds \SI{1.9}{\giga\byte} per layer in half precision. Audio must therefore
 be segmented, and without a song-level stage the model emits per-clip decisions
 while the task, and the published baselines, are per-song.
 
-The backbone contributes \SI{94.4}{\mega\nothing} frozen parameters and the head
-\SI{0.62}{\mega\nothing} trainable ones.
+The backbone contributes \num{94.4}~million frozen parameters and the head
+\num{0.62}~million trainable ones.
 
 \subsection{Classification heads and calibration}
 

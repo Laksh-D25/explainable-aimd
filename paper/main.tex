@@ -27,7 +27,6 @@ Cross-Generator and Cross-Corpus Evaluation of a\\
 MERT-Based Detector with Attention Pooling}
 
 \author[christ]{Laksh}
-\ead{}
 
 \affiliation[christ]{organization={Department of Computer Applications,
                                    CHRIST (Deemed to be University)},
@@ -39,8 +38,8 @@ Generative systems such as Suno and Udio now synthesise complete songs that
 listeners struggle to distinguish from human-composed music, and detectors built
 to identify them are known to generalise poorly: reported $F_1$ falls from 0.99
 in-distribution to 0.629 on an unseen generator. We build a detector on the
-frozen MERT music foundation model (\SI{94.4}{\mega\nothing} parameters) with a
-\SI{0.62}{\mega\nothing}-parameter trainable head that aggregates all thirteen
+frozen MERT music foundation model (\num{94.4}~million parameters) with a
+\num{0.62}~million-parameter trainable head that aggregates all thirteen
 hidden states by layer attention and pools frames and clips by learned
 attention, and we evaluate it under a protocol that separates two failure modes
 usually reported as one. On a balanced subset of SONICS (910 songs) the detector
@@ -79,7 +78,7 @@ generalisation \sep calibration \sep explainable AI \sep MERT
 \input{sections/08-conclusion}
 
 \section*{Data and code availability}
-Code, evaluation protocol and diagnostics are available at
+Code, evaluation protocol and diagnostics are available at\\
 \url{https://github.com/Laksh-D25/explainable-aimd}.
 
 \bibliographystyle{elsarticle-num}

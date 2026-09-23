@@ -125,6 +125,20 @@ def reliability_diagram(
     return _save(fig, out, pd.DataFrame(rows))
 
 
+#: Condition keys are identifiers in the pipeline and captions in a paper, and
+#: `noise_low_snr` reads as neither. The mapping lives here so the figure and
+#: the tables can be relabelled in one place.
+CONDITION_LABELS = {
+    "clean": "Clean",
+    "mp3_32": "MP3 32 kbit/s",
+    "pitch_large": "Pitch shift",
+    "noise_low_snr": "Additive noise",
+    "time_stretch": "Time stretch",
+    "lowpass_4k": "Low-pass 4 kHz",
+    "reverb": "Reverb",
+}
+
+
 def robustness_chart(robustness: pd.DataFrame, out: Path) -> Path:
     """F1 drop per held-out condition, sorted, one bar each.
 
@@ -133,12 +147,13 @@ def robustness_chart(robustness: pd.DataFrame, out: Path) -> Path:
     """
     plt = _plt()
     data = robustness.drop(index="clean", errors="ignore").sort_values("f1_drop")
+    labels = [CONDITION_LABELS.get(str(i), str(i)) for i in data.index]
     fig, ax = plt.subplots(figsize=(6.0, 0.42 * len(data) + 1.6))
 
     # Thin bars with a surface-coloured edge, so adjacent fills stay separated.
-    ax.barh(data.index, data["f1_drop"], color=SERIES[0], height=0.5,
+    ax.barh(labels, data["f1_drop"], color=SERIES[0], height=0.5,
             edgecolor=SURFACE, linewidth=1.2)
-    for name, value in zip(data.index, data["f1_drop"]):
+    for name, value in zip(labels, data["f1_drop"]):
         # Direct labels: the exact drop matters more than reading it off an axis.
         ax.text(value + 0.006, name, f"{value:+.3f}", va="center", fontsize=9, color=INK_MUTED)
 

@@ -65,7 +65,7 @@ def gpu_temp() -> float:
         return 0.0
 
 
-def matching_pids(pattern: str, exclude: set[int]) -> list[int]:
+def matching_pids(pattern: str, exclude: set[int], skip: str | None = None) -> list[int]:
     """PIDs whose command line matches, excluding this guard and its shell.
 
     Self-matching is the classic failure here: a pattern that appears in the
@@ -73,6 +73,12 @@ def matching_pids(pattern: str, exclude: set[int]) -> list[int]:
     """
     pids = []
     regex = re.compile(pattern)
+    # Some matching processes must never be stopped. A SIGSTOP costs a compute
+    # job nothing but wall-clock, while an upload holds an open socket the far
+    # end will close: pausing `kaggle competitions submit` mid-transfer can fail
+    # the submission outright. Those jobs also use almost no CPU, so they are
+    # not what is heating the machine.
+    skip_regex = re.compile(skip) if skip else None
     for proc in Path("/proc").iterdir():
         if not proc.name.isdigit():
             continue
@@ -84,6 +90,8 @@ def matching_pids(pattern: str, exclude: set[int]) -> list[int]:
         except OSError:
             continue
         if "thermal_guard" in cmdline:
+            continue
+        if skip_regex is not None and skip_regex.search(cmdline):
             continue
         if regex.search(cmdline):
             pids.append(pid)
@@ -124,6 +132,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--match", required=True,
                     help="regex matched against process command lines")
+    ap.add_argument("--exclude", default=None,
+                    help="regex for command lines to leave alone even when they match")
     ap.add_argument("--pause-at", type=float, default=90.0,
                     help="pause the workload at or above this CPU temp (C)")
     ap.add_argument("--resume-at", type=float, default=80.0,
@@ -156,7 +166,7 @@ def main() -> int:
          f"resume at {args.resume_at:.0f}C, sensor {sensor}")
 
     def shutdown(_sig, _frame):
-        held = [p for p in matching_pids(args.match, exclude) if is_stopped(p)]
+        held = [p for p in matching_pids(args.match, exclude, args.exclude) if is_stopped(p)]
         if held:
             signal_all(held, signal.SIGCONT)
             emit(f"resumed {len(held)} process(es) before exiting")
@@ -169,7 +179,7 @@ def main() -> int:
     pause_began = 0.0
     while True:
         temp = cpu_temp(sensor)
-        pids = matching_pids(args.match, exclude)
+        pids = matching_pids(args.match, exclude, args.exclude)
 
         if not pids:
             if paused:

@@ -27,6 +27,10 @@ LOG=/home/laksh/sonics/thermal_guard.log
 # non-destructive -- a stopped process keeps its memory and resumes -- so
 # guarding the machine rather than one project is the safer default.
 MATCH='rmml/\.venv/bin/python'
+# Never pause a transfer. SIGSTOP on an upload holds a socket the server will
+# eventually close, so pausing a Kaggle submission can fail it; these processes
+# are idle on CPU anyway and are not the reason the machine is hot.
+SKIP='kaggle|pip|rclone|yt-dlp|huggingface-cli|curl|wget'  
 
 restarts=0
 while true; do
@@ -37,7 +41,7 @@ while true; do
   if [ "$alive" -eq 0 ]; then
     restarts=$((restarts + 1))
     echo "$(date +%H:%M:%S) guard missing — restart #$restarts"
-    setsid "$PY" -u "$GUARD" --match "$MATCH" \
+    setsid "$PY" -u "$GUARD" --match "$MATCH" --exclude "$SKIP" \
       --pause-at 88 --resume-at 78 --interval 1.5 --wait --log "$LOG" \
       >> /home/laksh/sonics/guard_restarts.out 2>&1 < /dev/null &
     disown 2>/dev/null

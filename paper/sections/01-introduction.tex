@@ -31,7 +31,10 @@ This paper makes four contributions.
   \item We build a detector on the frozen MERT music foundation
         model~\cite{li2024mert} with a small attention-pooling head, and
         evaluate it under a protocol that varies the generator and the corpus of
-        \emph{real} music independently.
+        \emph{real} music independently. An ablation shows the head's design is
+        not what produces its accuracy: discarding twelve of the thirteen hidden
+        states, or replacing attention pooling with a mean, leaves every metric
+        unchanged.
   \item We show that these two axes behave completely differently. Withholding
         an entire generator while holding the real class fixed costs almost
         nothing ($F_1$ degradation $-0.037$ and $-0.023$, against $-0.361$

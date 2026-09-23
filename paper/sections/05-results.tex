@@ -18,6 +18,54 @@ Validation $F_1$ reaches 1.000 at the first epoch and remains there, so this
 figure is saturated and should be read as a ceiling rather than a measurement of
 architectural quality (Section~\ref{sec:limitations}).
 
+\subsection{What the architecture contributes}
+
+The detector's novelty claim rests on the head: learned attention over all
+thirteen MERT layers, and learned attention rather than averaging when pooling
+frames and clips. Table~\ref{tab:ablation} replaces each of those choices in
+turn, retraining from the same seed on the same split.
+
+\begin{table}[t]
+\centering
+\caption{Pooling and layer ablations ($n = 122$, 55 real). Every variant is
+retrained from the same seed. The three left-hand columns are identical to
+every digit across the first three rows; the entire spread across all four
+architectures is one song.}
+\label{tab:ablation}
+\begin{tabular}{lSSSS}
+\toprule
+Variant & {$F_1$} & {AUROC} & {FPR} & {ECE} \\
+\midrule
+Layer attention + attention pooling (full) & 0.9926 & 1.000 & 0.018 & 0.0041 \\
+Mean frame pooling                         & 0.9926 & 1.000 & 0.018 & 0.0082 \\
+Last hidden state only                     & 0.9926 & 1.000 & 0.018 & 0.0073 \\
+Mean clip$\rightarrow$song pooling         & 1.0000 & 1.000 & 0.000 & 0.0001 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The result is negative and we report it as such. Discarding twelve of the
+thirteen hidden states changes nothing. Replacing attention over frames with an
+unweighted mean changes nothing. Read as counts rather than rates, the first
+three rows each classify 121 of 122 songs correctly and each make the same
+single false positive out of 55 real songs; the fourth makes none. The full
+range of the table is one song, which is not a difference any of these
+architectures can be credited with.
+
+Two things follow. The architectural contribution is not measurable on this
+corpus, so the case for the design has to rest on the explanations it makes
+available---which Section~\ref{sec:discussion} argues is where its value
+actually lies---rather than on accuracy. And the one variant that is not
+identical is mean clip-to-song pooling, which is nominally the \emph{best} row.
+We draw no conclusion from that either: a single song separates it from the
+rest, and the run is one seed.
+
+What the table cannot do is discriminate, because validation $F_1$ reaches 1.000
+at the first epoch for every variant (Section~\ref{sec:limitations}). A corpus
+that separates this easily cannot rank heads. The honest reading is that this
+experiment is not yet informative, not that the choices are equivalent in
+general.
+
 \subsection{Robustness}
 
 Table~\ref{tab:robustness} reports degradation under six held-out perturbations,

@@ -33,6 +33,15 @@ Twelve songs, balanced by class. The separation is complete (6/6 against 0/6),
 but the sample is small enough that the effect size, not merely its direction,
 needs confirmation at scale.
 
+\paragraph{The ablations cannot rank the architecture}
+Every variant reaches validation $F_1$ 1.000 at the first epoch, and the four
+differ by a single test song. The table establishes that the pooling and
+layer-aggregation choices are not what produces the reported accuracy on this
+corpus; it cannot establish that they are equivalent in general, and a harder
+corpus may separate them.
+
 \paragraph{Single seed}
-Results are from one training run per configuration. Variance across seeds is
-unmeasured.
+Results are from one training run per configuration, including every ablation
+variant. Variance across seeds is unmeasured, and with a spread of one song it
+would very likely dominate the differences reported in
+Table~\ref{tab:ablation}.

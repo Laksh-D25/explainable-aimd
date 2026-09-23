@@ -20,7 +20,13 @@ LOG=/home/laksh/sonics/thermal_guard.log
 #
 # Matched on the *relative* path, because that is how the scripts are invoked:
 # an absolute-path pattern matched nothing and left the workload unguarded.
-MATCH='scripts/[a-z_]+\.py'
+#
+# Covers every job in this virtualenv, not only this project's. Unrelated
+# tuning runs were driving the die to 97 C on their own, and a firmware power
+# cut would destroy their hours of work as surely as ours. Pausing is
+# non-destructive -- a stopped process keeps its memory and resumes -- so
+# guarding the machine rather than one project is the safer default.
+MATCH='rmml/\.venv/bin/python'
 
 restarts=0
 while true; do

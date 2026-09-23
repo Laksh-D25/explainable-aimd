@@ -1,0 +1,88 @@
+%% Forensic Science International: Digital Investigation
+%% Elsevier elsarticle class, numbered citation style.
+%%
+%% Compile with:  latexmk -pdf main.tex
+%% Overleaf ships elsarticle, so no local class file is needed there.
+
+\documentclass[preprint,12pt,3p]{elsarticle}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage[hidelinks]{hyperref}
+\usepackage{url}
+
+\sisetup{detect-weight=true, detect-family=true}
+
+\journal{Forensic Science International: Digital Investigation}
+
+\begin{document}
+
+\begin{frontmatter}
+
+\title{What Do AI-Generated Music Detectors Actually Learn?\\
+Cross-Generator and Cross-Corpus Evaluation of a\\
+MERT-Based Detector with Attention Pooling}
+
+\author[christ]{Laksh}
+\ead{}
+
+\affiliation[christ]{organization={Department of Computer Applications,
+                                   CHRIST (Deemed to be University)},
+                     city={Bengaluru},
+                     country={India}}
+
+\begin{abstract}
+Generative systems such as Suno and Udio now synthesise complete songs that
+listeners struggle to distinguish from human-composed music, and detectors built
+to identify them are known to generalise poorly: reported $F_1$ falls from 0.99
+in-distribution to 0.629 on an unseen generator. We build a detector on the
+frozen MERT music foundation model (\SI{94.4}{\mega\nothing} parameters) with a
+\SI{0.62}{\mega\nothing}-parameter trainable head that aggregates all thirteen
+hidden states by layer attention and pools frames and clips by learned
+attention, and we evaluate it under a protocol that separates two failure modes
+usually reported as one. On a balanced subset of SONICS (910 songs) the detector
+reaches $F_1$ 0.957 with expected calibration error 0.0002. Holding the real
+class fixed and withholding an entire generator, transfer is near-complete in
+both directions (Suno$\rightarrow$Udio $F_1$ 0.963, Udio$\rightarrow$Suno 0.977;
+AUROC $\geq$ 0.9995; $F_1$ degradation $-0.037$ and $-0.023$ against $-0.361$
+reported previously). Evaluated on FakeMusicCaps, where five unseen
+text-to-music models are paired with a \emph{different} corpus of real music,
+the same detector falls to near chance (AUROC 0.598) and labels every real clip
+as generated (FPR 1.00, ECE 0.365). The two results reconcile under one
+explanation: the detector encodes what its training corpus's real music looks
+like rather than what generation leaves behind, so it survives a new generator
+but not a new population of real recordings. We further show that naive
+evaluation overstates performance---global loudness and dynamic-range
+descriptors alone separate the classes at 0.925 AUROC before
+normalisation---and that gradient-based temporal explanations are faithful for
+real audio but fail entirely for generated audio, indicating that generation
+evidence is spectrally distributed rather than temporally localised.
+\end{abstract}
+
+\begin{keyword}
+AI-generated music detection \sep audio forensics \sep cross-generator
+generalisation \sep calibration \sep explainable AI \sep MERT
+\end{keyword}
+
+\end{frontmatter}
+
+\input{sections/01-introduction}
+\input{sections/02-related-work}
+\input{sections/03-method}
+\input{sections/04-protocol}
+\input{sections/05-results}
+\input{sections/06-discussion}
+\input{sections/07-limitations}
+\input{sections/08-conclusion}
+
+\section*{Data and code availability}
+Code, evaluation protocol and diagnostics are available at
+\url{https://github.com/Laksh-D25/explainable-aimd}.
+
+\bibliographystyle{elsarticle-num}
+\bibliography{references}
+
+\end{document}

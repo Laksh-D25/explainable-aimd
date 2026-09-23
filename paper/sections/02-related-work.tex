@@ -1,0 +1,48 @@
+\section{Related work}
+\label{sec:related}
+
+\paragraph{Music representation models.}
+MERT~\cite{li2024mert} is a BERT-style transformer trained with a multi-task
+masked-prediction objective guided by a residual vector-quantisation acoustic
+teacher and a constant-Q transform musical teacher. It reaches competitive
+results across fourteen music information retrieval tasks while remaining
+computationally modest, and is released as a reusable feature extractor rather
+than a detector, which makes it a natural frozen backbone. Layer-wise analyses
+of self-supervised audio models show that depth encodes a transition from
+low-level acoustic to higher-level semantic features~\cite{elkheir2025}, which
+motivates learned aggregation across layers rather than use of a single layer.
+
+\paragraph{AI-music and synthetic-song detection.}
+Cros Vila et al.~\cite{crosvila2025} establish the cross-generator protocol and
+the $0.99 \rightarrow 0.629$ collapse this work takes as its reference point.
+SONICS~\cite{rahman2025sonics} supplies over 97{,}000 songs of real and
+end-to-end generated music from Suno and Udio, together with a spectro-temporal
+tokeniser that improves long-range modelling. Afchar et al.~\cite{afchar2025icassp}
+reframe detection as identifying a neural decoder's fingerprint and report 99.8\%
+accuracy while showing candidly that the accuracy is fragile under distribution
+shift. FakeMusicCaps~\cite{comanducci2025} extends the problem to attribution
+across five text-to-music generators and reports strong closed-set but weak
+open-set performance. A frequency-domain analysis~\cite{afchar2025ismir} grounds
+detectability in interpretable spectral evidence.
+
+\paragraph{Shortcuts and evaluation validity.}
+The closest methodological precedent is in singing-voice deepfake detection,
+where CtrSVDD~\cite{zang2024ctrsvdd} was constructed specifically to isolate
+synthesis artefacts from voice-separation artefacts, and SingFake~\cite{zang2024singfake}
+showed that speech-trained models degrade sharply under unseen singers and
+codecs. Both warn that pre-processing can confound a classifier. Our shortcut
+and bandwidth diagnostics extend that warning to the music setting and make it
+measurable.
+
+\paragraph{Explainability for audio detection.}
+Attention rollout for transformer audio classifiers~\cite{channing2025} frames
+transparency as a prerequisite for deployment. Time-domain relevance
+attribution~\cite{grinberg2025} identifies which temporal segments drive a
+decision, benchmarked against Grad-CAM and SHAP baselines. SHAP has been applied
+to spectrogram- and waveform-trained spoofing networks~\cite{yu2024}, and
+Mel-spectrogram CNNs with Grad-CAM-style localisation have been used to
+highlight fake-indicative regions~\cite{bajwa2025}. These methods target speech
+almost exclusively; an early benchmark for explainable machine-generated music
+detection~\cite{li2025explainable} notes that explanation fidelity remains an
+open metric. Our results bear directly on that: we find temporal attribution
+faithful for real audio and unfaithful for generated audio.

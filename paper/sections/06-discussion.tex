@@ -1,0 +1,81 @@
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{What the detector learned}
+
+The two cross-generator results are not in tension once the variable that
+actually changed is identified. Withholding Suno or Udio changes which
+generative process produced the synthetic class; the real class, its corpus, its
+provenance and its processing chain all stay fixed, and the detector transfers
+almost perfectly. Moving to FakeMusicCaps changes the generative processes
+\emph{and} replaces the real class with recordings from a different corpus, and
+the detector collapses---specifically, by calling every genuine recording
+synthetic.
+
+A detector that had learned the artefacts of generation would degrade on unseen
+generators and remain calm on unseen real music. Ours does the opposite. The
+most economical reading is that it has learned a model of what real music looks
+like in its training corpus, and treats departures from that model as evidence
+of synthesis. Under that reading a new generator is simply another departure and
+is handled correctly, while genuine music from an unfamiliar corpus is also a
+departure and is handled catastrophically.
+
+This has a practical consequence for deployment. A detector validated on
+cross-generator splits alone can appear robust and still be unusable, because
+the population of real music it will meet in production is never the population
+it was trained on. The failure it will exhibit is the expensive one: false
+accusation.
+
+\subsection{Why $F_1$ is the wrong headline}
+
+Our cross-corpus $F_1$ of 0.750 exceeds the published cross-generator baseline of
+0.629, and means nothing---it is exactly the score of a classifier that labels
+everything synthetic. The metric is not defective; it is being asked to do
+something it cannot, which is to distinguish a detector from a constant
+function when classes are unbalanced.
+
+Two cheap conventions prevent this. Report the all-positive baseline beside every
+$F_1$, and report false-positive rate alongside it. Either would have caught our
+degenerate result immediately. We would encourage their adoption as a norm in
+this literature, where class balance varies widely between evaluation sets and
+the cost of a false positive is the main reason the work is being done.
+
+\subsection{Calibration as a first-class result}
+
+The robustness table shows AUROC holding above 0.989 under four of six
+degradations while $F_1$ falls by up to 0.233, and the cross-corpus evaluation
+shows calibration error rising from $1.5\times10^{-4}$ to 0.365. In both cases
+the ranking survives and the decision rule does not.
+
+The mechanism is visible in threshold selection. Where validation separates the
+classes perfectly, the usual false-positive-budget threshold lands against the
+real class and any distribution shift sweeps the entire real population across
+it. Placing the threshold at the midpoint of the separating margin is a one-line
+change that moved false-positive rate from 1.00 to 0.00 in our cross-generator
+evaluation. Detectors intended for forensic use should report the threshold rule
+as part of the method, not as an implementation detail.
+
+\subsection{Explanation, and what it is evidence of}
+
+The faithfulness asymmetry---every explanation of real audio beating its random
+baseline, none of generated audio doing so---is a negative result about the
+method, not about the model. It says that whatever the detector uses to identify
+synthesis is not concentrated in time, and therefore that temporal attribution,
+which dominates the audio-explainability literature, cannot surface it.
+
+That is consistent with the frequency-domain characterisation of AI-music
+artefacts~\cite{afchar2025ismir}, and it is why we separated the frequency claim
+from the temporal one in Section~\ref{sec:method} rather than presenting a
+single Grad-CAM-style saliency map over a spectrogram the model never sees.
+
+The layer-level comparison carries a second warning. An attention-pooling
+architecture hands the analyst a ready-made explanation---the softmax over
+layers---and it is tempting to report it, because it costs nothing and looks
+like an answer. In our model it is flat to within 1.09$\times$ and its ordering
+is negatively rank-correlated with the exact Shapley attribution over the same
+layers in every audited song. The attention weights are not a weak version of
+the Shapley values; they point the other way. Architectural attention is
+evidence about the architecture, not about the decision, and papers that report
+it as an explanation should be read accordingly. This is the concrete payoff of
+running Levels~1 and~3 as a contrast rather than as two independent views: the
+disagreement is the finding.

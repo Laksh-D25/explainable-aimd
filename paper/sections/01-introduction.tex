@@ -1,0 +1,56 @@
+\section{Introduction}
+\label{sec:introduction}
+
+Generative systems such as Suno and Udio synthesise complete songs---vocals,
+instrumentation, lyrics and arrangement---that listeners struggle to
+distinguish from professionally produced human music. Streaming platforms now
+report that a substantial fraction of newly uploaded tracks are machine
+generated, which turns detection from an academic question into an operational
+requirement for distributors, rights organisations and digital service
+providers.
+
+Detection is also a forensic problem, and it inherits the asymmetry of one. A
+missed synthetic track costs a platform little. A human artist wrongly flagged
+as synthetic may lose income or reputation on the strength of a model's
+confidence. Any detector proposed for this setting therefore has to be
+characterised not only by how well it separates classes in the conditions it was
+trained on, but by how it fails when those conditions change, and by whether the
+confidence it reports can be trusted at the operating point where the decision
+is actually made.
+
+The literature reports a single headline failure: cross-generator collapse.
+Cros Vila et al.~\cite{crosvila2025} benchmark full-song detectors under an
+explicit cross-generator protocol and observe $F_1$ falling from 0.99
+in-distribution to 0.629 on an unseen generative family. That number is widely
+cited as the measure of the generalisation problem. We argue that it conflates
+two distinct failures, and that separating them changes what the problem is.
+
+This paper makes four contributions.
+
+\begin{enumerate}
+  \item We build a detector on the frozen MERT music foundation
+        model~\cite{li2024mert} with a small attention-pooling head, and
+        evaluate it under a protocol that varies the generator and the corpus of
+        \emph{real} music independently.
+  \item We show that these two axes behave completely differently. Withholding
+        an entire generator while holding the real class fixed costs almost
+        nothing ($F_1$ degradation $-0.037$ and $-0.023$, against $-0.361$
+        reported previously). Changing the corpus of real music collapses the
+        same detector to near chance (AUROC 0.598) and causes it to label every
+        genuine recording as synthetic (FPR 1.00).
+  \item We give the explanation that reconciles them: the detector encodes what
+        the real music in its training corpus looks like, rather than what
+        generation leaves behind. Generalisation to new generators is therefore
+        not evidence of generalisation at all.
+  \item We report two diagnostics that any future work in this area can apply: a
+        shortcut test showing that global loudness and dynamic-range descriptors
+        alone separate the classes at 0.925 AUROC before normalisation, and a
+        false-positive-rate check on unseen real music that exposes the
+        corpus-dependence directly.
+\end{enumerate}
+
+We also find that the $F_1$ conventionally reported in this setting can be
+actively misleading: on our cross-corpus evaluation the detector's $F_1$ of
+0.750 is identical, to four decimal places, to that of a classifier that labels
+every input synthetic. Reporting $F_1$ alone would have presented a total
+failure as an improvement over the published baseline.

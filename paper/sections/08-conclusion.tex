@@ -1,0 +1,33 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+We evaluated a MERT-based AI-music detector under a protocol that varies the
+generator and the corpus of real music independently, and found that these two
+axes behave completely differently. Withholding an entire generator while
+holding the real class fixed costs almost nothing: $F_1$ degrades by 0.037 and
+0.023 across the two Suno/Udio directions, against 0.361 reported previously.
+Replacing the corpus of real music collapses the same detector to near chance
+and causes it to label every genuine recording as synthetic.
+
+The reconciling explanation is that the detector encodes what real music looks
+like in its training corpus rather than what generation leaves behind. Strong
+cross-generator numbers are therefore not evidence that a detector has learned
+to recognise synthesis, and a detector validated on cross-generator splits alone
+may fail in deployment in the most costly direction available to it.
+
+We also found that the conventional headline metric conceals this. Our
+cross-corpus $F_1$ of 0.750 exceeds the published baseline of 0.629 and is
+identical to the score of a classifier that labels every input synthetic.
+Reporting the all-positive baseline and the false-positive rate alongside $F_1$
+would have made the failure visible at a glance, and we recommend both as
+routine practice.
+
+Finally, gradient-based temporal explanation proved faithful for real audio and
+unfaithful for generated audio, indicating that the evidence for synthesis is
+not localised in time and that frequency-resolved explanation is the appropriate
+tool.
+
+The immediate next step is an evaluation in which two architecturally distinct
+generator families are paired with a \emph{shared} corpus of real music, which
+would separate the corpus effect from the generator effect that this work shows
+are conflated in current practice.

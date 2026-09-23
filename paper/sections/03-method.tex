@@ -1,0 +1,86 @@
+\section{Method}
+\label{sec:method}
+
+\subsection{Architecture}
+
+The detector is a frozen MERT-v1-95M backbone with a small trainable head.
+Audio is resampled to \SI{24}{\kilo\hertz} mono and segmented into fixed clips;
+MERT returns thirteen hidden states per clip at \SI{74.8}{\hertz}, each of
+dimension 768. The head aggregates these in three stages.
+
+\paragraph{Per-layer normalisation.}
+The thirteen states already share a shape, but differ substantially in scale.
+Without normalisation the layer-attention softmax tracks magnitude rather than
+informativeness, so each state is passed through its own layer normalisation
+before weighting.
+
+\paragraph{Layer attention.}
+A learned scalar per layer, softmax-normalised, produces a weighted sum over
+depth. Learning one global profile rather than a per-example weighting keeps the
+weights readable as an explanation: they state which depths the detector relies
+on in general.
+
+\paragraph{Temporal and clip pooling.}
+Additive attention pools frames within a clip, and a second attention stage
+pools clips within a song. The second stage is necessary rather than
+decorative. SONICS songs run \SIrange{32}{240}{\second}, MERT was pre-trained on
+\SI{5}{\second} clips, and its attention is $O(T^2)$: at \SI{74.8}{\hertz} a
+\SI{120}{\second} song is roughly 9000 frames, whose attention matrix alone
+exceeds \SI{1.9}{\giga\byte} per layer in half precision. Audio must therefore
+be segmented, and without a song-level stage the model emits per-clip decisions
+while the task, and the published baselines, are per-song.
+
+The backbone contributes \SI{94.4}{\mega\nothing} frozen parameters and the head
+\SI{0.62}{\mega\nothing} trainable ones.
+
+\subsection{Classification heads and calibration}
+
+The primary output is a binary real/synthetic logit; an auxiliary head predicts
+the four-way SONICS taxonomy and is down-weighted so it cannot dominate the
+objective that is reported. Probabilities are calibrated by temperature scaling
+fitted on validation, never on the evaluation set.
+
+Choosing the operating point required care. When validation separates the
+classes completely---which it does here---the conventional choice of the
+$(1-\alpha)$ quantile of scores on real music places the threshold immediately
+against the real class. That threshold is valid on validation and catastrophic
+elsewhere: applied to a shifted distribution it labels everything synthetic. We
+instead place the threshold at the midpoint of the separating margin, which
+scores identically on validation but is maximally distant from both classes and
+therefore far more likely to survive a shift. Section~\ref{sec:results}
+quantifies the difference: the quantile threshold yields FPR 1.00 on the
+cross-corpus evaluation, the midpoint threshold FPR 0.00 on the cross-generator
+one.
+
+\subsection{Explanation layer}
+
+Three levels are produced for every explained song.
+
+\textbf{Level 1} reports the learned attention weights over layers, frames and
+clips, which the architecture yields at no cost.
+
+\textbf{Level 2} localises evidence in the signal. MERT consumes raw waveform
+through a one-dimensional convolutional stack whose output is
+$512~\text{channels} \times \text{time}$; no time--frequency map exists anywhere
+in the forward graph. Gradient-based attribution taken there localises
+\emph{when}, not \emph{at which frequency}, and we report it as such (Level 2a).
+For frequency evidence we occlude tiles in the short-time Fourier domain and
+resynthesise, which measures what the model does when a band is actually absent
+(Level 2b); this is expensive and is applied to an audit subset.
+
+\textbf{Level 3} computes exact Shapley values over the thirteen layers, treating
+each hidden state as a player and the logit under a renormalised subset as the
+coalition value. With thirteen layers the $2^{13}$ coalitions are affordable
+because the frozen backbone runs once and only the small head is re-evaluated.
+
+Levels 1 and 3 answer different questions---what the model weights, versus what
+moved a particular decision---and we report their disagreement rather than
+averaging it away.
+
+\subsection{Explanation faithfulness}
+
+No explanation is reported without being scored. We mask the regions an
+explanation marks important and measure the movement in the logit against
+masking randomly chosen regions of the same extent. The quantity reported is the
+\emph{gap} against that random baseline, not the raw deletion curve: masking any
+audio degrades a detector somewhat, so a steep curve alone establishes nothing.

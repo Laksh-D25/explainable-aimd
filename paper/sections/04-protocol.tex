@@ -1,0 +1,72 @@
+\section{Evaluation protocol}
+\label{sec:protocol}
+
+The protocol is the paper's main methodological contribution, so we state the
+rules it enforces and why each exists.
+
+\subsection{Splitting}
+
+Splits are by song, never by clip. A song yields eight to twelve clips; if clips
+of one song fall on both sides, the model can recognise the song rather than the
+generator. Splits are stratified by the four-way taxonomy so that rare
+sub-classes are represented everywhere.
+
+We note a property of SONICS's own published splits that appears not to have
+been reported: its \texttt{id} field links a real song to the synthetic tracks
+generated from it, and 4{,}349 source identifiers---12.9\% of rows---appear in
+more than one official split. A real recording can therefore sit in the test set
+while a track generated from its lyrics and style sits in validation. We report
+this rather than repairing it, since re-splitting forfeits comparability with
+published figures.
+
+\subsection{Removing shortcuts before measuring}
+
+Before any detector is trained we ask whether the classes are separable without
+reference to generation at all, by fitting a linear model on eight global
+descriptors of the recording---loudness, crest factor, spectral rolloff,
+centroid, zero-crossing rate and high-frequency energy share. None of these
+describe how audio was produced; a large AUROC means a 94-million-parameter
+transformer will find the same shortcut immediately.
+
+The first such test returned \textbf{0.925 AUROC}. Commercial releases are
+mastered loud and heavily compressed while generated tracks are not, so loudness
+and crest factor alone carried the classification. Peak normalisation reduced
+this to 0.840 and root-mean-square normalisation to 0.821; crest factor is
+scale-invariant and survives both. Randomising dynamic range---applied to both
+classes and to evaluation as well as training, since the aim is to remove a
+confound from the task rather than to augment one split---brought the residual
+to \textbf{0.714}, and to \textbf{0.737} on the final 910-song corpus. We report
+detector performance only against that baseline.
+
+A second diagnostic compares the spectral bandwidth of the two classes. Real
+audio fetched from streaming sources at one bitrate and generated audio
+distributed at another are trivially separable on codec artefacts. We match the
+bitrate distribution of the real class to the generated set and verify that the
+median spectral-rolloff ratio falls below a fixed threshold before reporting any
+figure.
+
+\subsection{Three evaluation axes}
+
+\paragraph{In-distribution.}
+Held-out songs, same generators, same corpus. A sanity number.
+
+\paragraph{Cross-generator, shared corpus.}
+SONICS contains both Suno and Udio. Training on one and testing on the other
+isolates the generator: corpus, pipeline, processing and real class are all held
+fixed. Real songs are divided disjointly between the halves, and both directions
+are run because transfer is not symmetric in general.
+
+\paragraph{Cross-corpus.}
+FakeMusicCaps pairs five unseen text-to-music generators with real music from
+MusicCaps. Here the generator \emph{and} the corpus of real music change
+together. We band-limit the real clips to the generated set's sample rate and
+verify bandwidth before reporting.
+
+\subsection{Reporting rules}
+
+Every cross-generator result is reported beside the $F_1$ that a classifier
+labelling all inputs synthetic would obtain on the same class balance. This is
+not a formality: our own cross-corpus $F_1$ of 0.750 matches that baseline to
+four decimal places. AUROC and false-positive rate are reported alongside $F_1$
+throughout, because $F_1$ alone cannot distinguish a working detector from a
+degenerate one.

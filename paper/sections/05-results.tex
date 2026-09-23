@@ -25,7 +25,7 @@ thirteen MERT layers, and learned attention rather than averaging when pooling
 frames and clips. Table~\ref{tab:ablation} replaces each of those choices in
 turn, retraining from the same seed on the same split.
 
-\begin{table}[t]
+\begin{table}[!ht]
 \centering
 \caption{Pooling and layer ablations ($n = 122$, 55 real). Every variant is
 retrained from the same seed. The three left-hand columns are identical to
@@ -71,7 +71,7 @@ general.
 Table~\ref{tab:robustness} reports degradation under six held-out perturbations,
 none seen during training.
 
-\begin{table}[t]
+\begin{table}[!ht]
 \centering
 \caption{Robustness to held-out degradations ($n = 122$). AUROC is largely
 preserved while $F_1$ falls, indicating that discrimination survives but the
@@ -98,7 +98,7 @@ ability to rank synthetic above real audio is robust; the threshold at which
 that ranking becomes a decision is not. A study reporting $F_1$ alone would
 describe this as a robustness failure, when it is a calibration failure.
 
-\begin{figure}[t]
+\begin{figure}[!ht]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_robustness.pdf}
 \caption{$F_1$ loss under each held-out degradation, grouped by perturbation
@@ -114,7 +114,7 @@ Table~\ref{tab:gensplit} reports both Suno/Udio directions. Each is trained on
 one generator and tested on the other, with real songs divided disjointly and
 both classes balanced in each half.
 
-\begin{table}[t]
+\begin{table}[!ht]
 \centering
 \caption{Cross-generator transfer within SONICS ($n = 362$ per direction). The
 all-positive baseline is 0.667; both results are well clear of it.}
@@ -156,7 +156,7 @@ recognition-of-real-music move together and identify the mechanism: FPR 1.00
 means every genuine MusicCaps recording was called synthetic. The detector did
 not fail to recognise new generators; it failed to recognise new real music.
 
-\begin{figure}[t]
+\begin{figure}[!ht]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_transfer.pdf}
 \caption{Transfer survives a new generator but not a new corpus of real music.
@@ -177,7 +177,7 @@ masking at random. Figure~\ref{fig:faithfulness} shows the deletion curve for
 one real recording, where the explanation-ordered curve stays below the random
 one across the whole sweep.
 
-\begin{figure}[t]
+\begin{figure}[!ht]
 \centering
 \includegraphics[width=0.78\textwidth]{figures/fig_faithfulness.pdf}
 \caption{Deletion curve for a real recording (\texttt{real\_27619},
@@ -209,7 +209,7 @@ logit. Reporting Level~1 alone---the explanation the architecture supplies for
 free, and the one most readily quoted---would have produced a confident
 explanation that the model's behaviour contradicts.
 
-\begin{figure}[t]
+\begin{figure}[!ht]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_layers.pdf}
 \caption{What the model says it weights against what actually moved the

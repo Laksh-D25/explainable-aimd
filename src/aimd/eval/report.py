@@ -70,11 +70,26 @@ def _style(ax) -> None:
 
 
 def _save(fig, out: Path, data: pd.DataFrame | None = None) -> Path:
-    """Write PDF (vector, for print) and PNG, plus the numbers as CSV."""
+    """Write PDF (vector, for print) and PNG, plus the numbers as CSV.
+
+    The PDF is written transparent and the PNG on SURFACE. On screen the
+    off-white surface is what keeps a figure from glaring; dropped into a paper
+    it becomes a visible grey panel floating on the page, because the page is
+    already white and the figure no longer needs its own background.
+    """
     out = Path(out)
     out.parent.mkdir(parents=True, exist_ok=True)
     fig.tight_layout()
-    fig.savefig(out.with_suffix(".pdf"), facecolor=SURFACE, bbox_inches="tight")
+
+    patches = [fig.patch, *(ax.patch for ax in fig.axes)]
+    saved = [p.get_facecolor() for p in patches]
+    for patch in patches:
+        patch.set_facecolor("none")
+    fig.savefig(out.with_suffix(".pdf"), facecolor="none", transparent=True,
+                bbox_inches="tight")
+    for patch, colour in zip(patches, saved):
+        patch.set_facecolor(colour)
+
     fig.savefig(out.with_suffix(".png"), dpi=200, facecolor=SURFACE, bbox_inches="tight")
     if data is not None:
         data.to_csv(out.with_suffix(".csv"), index=False)

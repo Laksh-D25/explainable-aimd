@@ -4,7 +4,7 @@
 %% Compile with:  latexmk -pdf main.tex
 %% Overleaf ships elsarticle, so no local class file is needed there.
 
-\documentclass[preprint,12pt,3p]{elsarticle}
+\documentclass[final,5p,times,twocolumn]{elsarticle}
 
 \usepackage{amsmath}
 \usepackage{amssymb}
@@ -16,6 +16,8 @@
 
 \sisetup{detect-weight=true, detect-family=true, per-mode=symbol}
 
+\raggedbottom
+
 \journal{Forensic Science International: Digital Investigation}
 
 \begin{document}
@@ -26,13 +28,22 @@
 Fails Against Unseen Architectures:\\
 Evidence from a Controlled Real Corpus}
 
-\author[christ]{Laksh D}
+\author[christ]{Laksh D\corref{cor1}}
+\cortext[cor1]{Corresponding author.}
 \ead{laksh.d@bcah.christuniversity.in}
 
 \affiliation[christ]{organization={Department of Computer Applications,
                                    CHRIST (Deemed to be University)},
                      city={Bengaluru},
                      country={India}}
+
+\begin{highlights}
+\item Cross-generator music detection fails against unseen generator architectures.
+\item With the real corpus held fixed, AUROC falls from 0.996 to 0.531, i.e.\ chance.
+\item On AudioLDM2 the detector inverts, ranking generated audio above real music.
+\item Suno and Udio transfer only because they are near-identical commercial systems.
+\item $F_1$ alone hides this: our cross-corpus $F_1$ equals an all-positive classifier.
+\end{highlights}
 
 \begin{abstract}
 Generative systems such as Suno and Udio now synthesise complete songs that

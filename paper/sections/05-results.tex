@@ -26,7 +26,7 @@ thirteen MERT layers, and learned attention rather than averaging when pooling
 frames and clips. Table~\ref{tab:ablation} replaces each of those choices in
 turn, retraining from the same seed on the same split.
 
-\begin{table}[!ht]
+\begin{table*}[t]
 \centering
 \caption{Pooling and layer ablations ($n = 122$, 55 real). Every variant is
 retrained from the same seed. The three left-hand columns are identical to
@@ -43,7 +43,7 @@ Last hidden state only                     & 0.9926 & 1.000 & 0.018 & 0.0073 \\
 Mean clip$\rightarrow$song pooling         & 1.0000 & 1.000 & 0.000 & 0.0001 \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 The result is negative and we report it as such. Discarding twelve of the
 thirteen hidden states changes nothing. Replacing attention over frames with an
@@ -72,7 +72,7 @@ general.
 Table~\ref{tab:robustness} reports degradation under six held-out perturbations,
 none seen during training.
 
-\begin{table}[!ht]
+\begin{table*}[t]
 \centering
 \caption{Robustness to held-out degradations ($n = 122$). AUROC is largely
 preserved while $F_1$ falls, indicating that discrimination survives but the
@@ -91,7 +91,7 @@ Pitch shift      & pitch  & 0.724 & 0.999 & -0.233 \\
 Additive noise   & noise  & 0.709 & 0.904 & -0.248 \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 The pattern matters more than the magnitudes. Under four of six conditions AUROC
 remains at or above 0.989 while $F_1$ falls by up to 0.233. The detector's
@@ -99,15 +99,15 @@ ability to rank synthetic above real audio is robust; the threshold at which
 that ranking becomes a decision is not. A study reporting $F_1$ alone would
 describe this as a robustness failure, when it is a calibration failure.
 
-\begin{figure}[!ht]
+\begin{figure*}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig_robustness.pdf}
+\includegraphics[width=0.72\textwidth]{figures/fig_robustness.pdf}
 \caption{$F_1$ loss under each held-out degradation, grouped by perturbation
 family. No condition was seen during training. The ordering is not the one a
 codec-artefact account of detection would predict: pitch shift and additive
 noise cost more than \SI{32}{\kilo\bit\per\second} MP3.}
 \label{fig:robustness}
-\end{figure}
+\end{figure*}
 
 \subsection{Cross-generator within one generator family}
 
@@ -117,7 +117,7 @@ both classes balanced in each half. Suno and Udio are both commercial
 end-to-end song generators, so this measures transfer \emph{within} a family;
 Section~\ref{sec:sharedreal} measures it across families.
 
-\begin{table}[!ht]
+\begin{table*}[t]
 \centering
 \caption{Cross-generator transfer within SONICS ($n = 362$ per direction). The
 all-positive baseline is 0.667; both results are well clear of it.}
@@ -130,7 +130,7 @@ Suno $\rightarrow$ Udio & 1.000 & 0.963 & 0.9995 & 0.000 & 0.031 \\
 Udio $\rightarrow$ Suno & 1.000 & 0.977 & 1.0000 & 0.000 & 0.022 \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 Degradation is $-0.037$ and $-0.023$ in $F_1$, against the $-0.361$ reported by
 Cros Vila et al. False-positive rate is zero in both directions and calibration
@@ -167,7 +167,7 @@ is tested against five unseen text-to-music models, with the same 58 held-out
 MusicCaps recordings supplying the real class in every comparison.
 Table~\ref{tab:sharedreal} reports the result.
 
-\begin{table}[!ht]
+\begin{table*}[t]
 \centering
 \caption{Cross-generator transfer with the real class held fixed. The same 58
 MusicCaps recordings are the real class in every row, which is why the
@@ -187,7 +187,7 @@ Five unseen text-to-music models       & 0.138 & 0.531 & 0.069 & 0.790 \\
 \quad AudioLDM2                        & 0.000 & 0.277 & 0.069 & 0.580 \\
 \bottomrule
 \end{tabular}
-\end{table}
+\end{table*}
 
 AUROC falls from 0.996 to \textbf{0.531}, which is chance, while the
 false-positive rate is identical at 0.069 on both sides. The detector recognises real
@@ -200,16 +200,16 @@ AudioLDM2 reaches AUROC 0.277: its output is ranked as \emph{more} authentic
 than human recordings, consistently enough to invert the ordering.
 Figure~\ref{fig:sharedreal} shows the profile.
 
-\begin{figure}[!ht]
+\begin{figure*}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig_sharedreal.pdf}
+\includegraphics[width=0.95\textwidth]{figures/fig_sharedreal.pdf}
 \caption{Discrimination against each generator, with the real class fixed. The
 leftmost bar is the generator family the detector was trained on; the rest are
 unseen. Four of the five sit at or below 0.62 and one falls below chance. The
 false-positive rate is 0.069 for every bar, because the real class never
 changes.}
 \label{fig:sharedreal}
-\end{figure}
+\end{figure*}
 
 The control matters here, so we report both runs. An earlier version resampled
 only the SONICS tracks to \SI{16}{\kilo\hertz} and left the other sources at
@@ -237,9 +237,9 @@ remains a real and serious failure; but it is a threshold failure, separable
 from and additional to the loss of discrimination. The two move independently,
 which is precisely why both must be reported.
 
-\begin{figure}[!ht]
+\begin{figure*}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig_transfer.pdf}
+\includegraphics[width=1.0\textwidth]{figures/fig_transfer.pdf}
 \caption{The two failures are independent. Left: AUROC on the unseen
 generator. Right: the fraction of genuine recordings labelled synthetic.
 Suno$\rightarrow$Udio keeps both intact, but Suno and Udio are near-identical
@@ -247,7 +247,7 @@ commercial systems. On FakeMusicCaps AUROC falls to 0.598 \emph{and} every real
 clip is misclassified. Section~\ref{sec:sharedreal} separates these: the AUROC
 loss survives with the real class held fixed, the FPR failure does not.}
 \label{fig:transfer}
-\end{figure}
+\end{figure*}
 
 \subsection{Explanation faithfulness}
 
@@ -259,9 +259,9 @@ masking at random. Figure~\ref{fig:faithfulness} shows the deletion curve for
 one real recording, where the explanation-ordered curve stays below the random
 one across the whole sweep.
 
-\begin{figure}[!ht]
+\begin{figure*}[t]
 \centering
-\includegraphics[width=0.78\textwidth]{figures/fig_faithfulness.pdf}
+\includegraphics[width=0.52\textwidth]{figures/fig_faithfulness.pdf}
 \caption{Deletion curve for a real recording (\texttt{real\_27619},
 faithfulness gap $-3.50$). Audio is masked in order of attributed relevance
 (solid) or at random (dashed) and the binary logit is re-measured. The
@@ -269,7 +269,7 @@ explanation is faithful when its curve sits below the random one, as it does
 here across the whole sweep. Every real recording in the audit behaves this way;
 no generated one does.}
 \label{fig:faithfulness}
-\end{figure}
+\end{figure*}
 
 Temporal attribution is therefore inadequate for exactly the class the
 application cares about. The evidence a detector uses for ``synthetic'' is not
@@ -291,9 +291,9 @@ logit. Level~1 is the explanation the architecture supplies for free, and the
 one most readily quoted. Reporting it alone would have produced a confident
 explanation that the model's behaviour contradicts.
 
-\begin{figure}[!ht]
+\begin{figure*}[t]
 \centering
-\includegraphics[width=\textwidth]{figures/fig_layers.pdf}
+\includegraphics[width=0.82\textwidth]{figures/fig_layers.pdf}
 \caption{What the model says it weights against what actually moved the
 decision, paired per MERT hidden state. Both quantities are normalised to sum to
 one so that a single axis is meaningful. The attention weights (L1) are flat:
@@ -302,4 +302,4 @@ Shapley shares (L3) span 0.003--0.172, a spread of 49$\times$, and concentrate
 in the middle of the stack (layers 3--4). The last hidden state, the one a
 conventional last-layer probe would use, carries the smallest share of all.}
 \label{fig:layers}
-\end{figure}
+\end{figure*}

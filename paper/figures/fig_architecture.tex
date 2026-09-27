@@ -1,0 +1,78 @@
+% Detector architecture. Drawn in TikZ rather than imported, so the figure uses
+% the document's own fonts and stays editable alongside the text.
+%
+% Placed on explicit coordinates rather than with relative positioning: the
+% three rows have different box counts and widths, and letting TikZ chain them
+% put the augmentation box on top of the layer-attention box.
+%
+% Three corrections against the architecture as originally drawn, each argued
+% in Section 3. MERT's RVQ-VAE and CQT teachers are pre-training targets that do
+% not exist at inference, so they are marked as provenance rather than drawn in
+% the forward path. A clip-to-song stage is required because the task is
+% per-song while MERT is per-clip. And Level 2a attribution on the convolutional
+% output is temporal, not time-frequency, because no spectrogram is in the graph.
+\begin{tikzpicture}[
+  font=\footnotesize,
+  box/.style={draw, rounded corners=1.5pt, align=center, inner sep=4pt,
+              minimum height=10mm, line width=0.4pt},
+  data/.style={box, fill=black!5},
+  pre/.style={box, fill=black!8},
+  bb/.style={box, fill=black!12},
+  pool/.style={box, fill=black!5},
+  head/.style={box, fill=black!8},
+  ghost/.style={box, dashed, fill=none, text=black!55, line width=0.35pt},
+  flow/.style={->, >=latex, line width=0.55pt},
+  aux/.style={->, >=latex, dashed, line width=0.4pt},
+  lbl/.style={font=\scriptsize, text=black!50, inner sep=1.5pt},
+  tag/.style={font=\scriptsize\bfseries, text=black!45, inner sep=1pt},
+]
+
+% ---- row 1: input through the frozen backbone ------------------------------
+\node[data, text width=21mm] (in)   at ( 1.35, 0) {Audio in\\32--240\,s};
+\node[pre,  text width=30mm] (pre)  at ( 5.05, 0) {Resample 24\,kHz mono\\Segment $4\times5$\,s\\RMS normalise};
+\node[bb,   text width=26mm] (conv) at ( 9.15, 0) {1-D conv encoder\\512 ch $\times$ time};
+\node[bb,   text width=32mm] (tr)   at (13.60, 0) {12-layer transformer\\13 states, 768-d};
+
+\node[pre, text width=30mm, font=\scriptsize] (aug) at (5.05, 1.95)
+  {Augmentation, \emph{train split only}};
+\node[ghost, text width=36mm, font=\scriptsize] (teach) at (13.60, 2.05)
+  {RVQ-VAE and CQT teachers\\\emph{pre-training only}};
+
+\draw[flow] (in)   -- (pre);
+\draw[flow] (pre)  -- (conv);
+\draw[flow] (conv) -- (tr);
+\draw[aux]  (aug)   -- (pre);
+\draw[aux]  (teach) -- node[lbl, right] {weights} (tr);
+\node[draw, dotted, rounded corners=2pt, line width=0.5pt,
+      fit=(conv)(tr), inner sep=5pt] (bbfit) {};
+\node[lbl, anchor=north east] at ($(bbfit.south east)+(0,-0.12)$)
+  {frozen MERT-v1-95M, 94.4\,M parameters};
+\node[tag] at (9.15, 0.95) {L2a};
+
+% ---- row 2: the trainable head --------------------------------------------
+\node[pool, text width=23mm] (ln) at ( 1.70, -3.30) {Per-layer\\LayerNorm};
+\node[pool, text width=23mm] (la) at ( 5.55, -3.30) {Layer attention\\softmax over 13};
+\node[pool, text width=23mm] (ta) at ( 9.55, -3.30) {Temporal pooling\\softmax over $T$};
+\node[pool, text width=23mm] (sa) at (13.55, -3.30) {Clip $\rightarrow$ song\\masked attention};
+
+\draw[flow] (bbfit.south) -- ++(0,-0.75) -- node[lbl, above, pos=0.62] {$13\times[T,768]$} (1.70,-1.90) -- (ln.north);
+\draw[flow] (ln) -- (la);
+\draw[flow] (la) -- node[lbl, above] {$[T,768]$} (ta);
+\draw[flow] (ta) -- node[lbl, above] {$[768]$} (sa);
+\node[tag] at (5.55, -2.35) {L1, L3};
+\node[tag] at (9.55, -2.35) {L1};
+\node[tag] at (13.55, -2.35) {L1};
+
+% ---- row 3: heads, calibration, output -------------------------------------
+\node[head, text width=38mm] (bin) at ( 3.40, -5.90)
+  {\textbf{Binary head} (primary)\\{\scriptsize + auxiliary taxonomy head}};
+\node[head, text width=40mm] (cal) at ( 8.85, -5.90)
+  {Temperature scaling\\{\scriptsize threshold at margin midpoint}};
+\node[data, text width=26mm] (out) at (13.55, -5.90)
+  {Calibrated\\real / synthetic};
+
+\draw[flow] (sa.south) -- ++(0,-0.75) -| node[lbl, above, pos=0.25] {$[768]$/song} (bin.north);
+\draw[flow] (bin) -- (cal);
+\draw[flow] (cal) -- (out);
+
+\end{tikzpicture}

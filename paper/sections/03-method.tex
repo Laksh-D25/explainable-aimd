@@ -3,6 +3,24 @@
 
 \subsection{Architecture}
 
+Figure~\ref{fig:architecture} shows the detector end to end.
+
+\begin{figure*}[t]
+\centering
+\resizebox{\textwidth}{!}{\input{figures/fig_architecture}}
+\caption{The detector. Audio is segmented into four \SI{5}{\second} clips,
+passed through the frozen MERT backbone, and aggregated by three attention
+stages: over the thirteen hidden states, over frames within a clip, and over
+clips within a song. Solid arrows carry the forward path; dashed arrows mark
+inputs that are not part of it. MERT's RVQ-VAE and CQT teachers are
+pre-training targets and are absent at inference, and augmentation is applied
+to the training split only. Bold tags mark where each explanation level is
+taken: L1 from the attention weights, L2a from the convolutional output, which
+is channel$\times$time and therefore localises \emph{when} rather than at which
+frequency, and L3 from Shapley values over the thirteen hidden states.}
+\label{fig:architecture}
+\end{figure*}
+
 The detector is a frozen MERT-v1-95M backbone with a small trainable head.
 Audio is resampled to \SI{24}{\kilo\hertz} mono and segmented into fixed clips;
 MERT returns thirteen hidden states per clip at \SI{74.8}{\hertz}, each of

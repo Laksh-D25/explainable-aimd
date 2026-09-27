@@ -4,7 +4,7 @@ flowchart TD
     IN["Audio Input<br/>SONICS: Real + Suno/Udio<br/>songs 32–240 s"]
 
     subgraph PRE["Pre-processing"]
-        RS["Resampling<br/>24 kHz mono"] --> SG["Segmentation<br/>fixed 10 s clips<br/>8 per song"] --> NM["Peak<br/>Normalisation"]
+        RS["Resampling<br/>24 kHz mono"] --> SG["Segmentation<br/>fixed 5 s clips<br/>4 per song"] --> NM["RMS<br/>Normalisation"]
     end
 
     AUG["Data Augmentation<br/><i>train split only</i><br/>MP3 128k · pitch ±2<br/>noise · gain"]
@@ -38,7 +38,7 @@ flowchart TD
     SA --> BIN & TAX
     SA -.-> SRC
 
-    CAL["Temperature Scaling<br/>fitted on validation · ECE reported<br/>threshold at 1% false-positive budget"]
+    CAL["Temperature Scaling<br/>fitted on validation · ECE reported<br/>threshold at the separating-margin midpoint"]
     BIN --> CAL
     OUT(["Calibrated Prediction<br/>→ Figure 2"])
     CAL --> OUT

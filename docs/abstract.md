@@ -1,41 +1,22 @@
-# Abstract (draft)
+# Abstract
 
-**Title (working):** What do AI-generated music detectors actually learn?
-Cross-generator and cross-corpus evaluation of a MERT-based detector with
-attention pooling
-
----
-
-Generative systems such as Suno and Udio now synthesise complete songs that
-listeners struggle to distinguish from human-composed music, and detectors
-built to identify them are known to generalise poorly: reported F1 falls from
-0.99 in-distribution to 0.629 on an unseen generator. We build a detector on the
-frozen MERT music foundation model (94.4 M parameters) with a 0.62 M-parameter
-trainable head that aggregates all thirteen hidden states by layer attention and
-pools frames and clips by learned attention, and we evaluate it under a protocol
-that separates two failure modes usually reported as one. On a balanced subset
-of SONICS (910 songs) the detector reaches F1 0.957 with expected calibration
-error 0.0002. Holding the real class fixed and withholding an entire generator,
-transfer is near-complete in both directions (Suno→Udio F1 0.963, Udio→Suno
-0.977; AUROC ≥ 0.9995; F1 degradation −0.037 and −0.023 against −0.361 reported
-previously). Evaluated on FakeMusicCaps, where five unseen text-to-music models
-are paired with a *different* corpus of real music, the same detector falls to
-near chance (AUROC 0.598) and labels every real clip as generated (FPR 1.00,
-ECE 0.365). The two results reconcile under one explanation: the detector
-encodes what its training corpus's real music looks like rather than what
-generation leaves behind, so it survives a new generator but not a new
-population of real recordings. We further show that naive evaluation overstates
-performance — global loudness and dynamic-range descriptors alone separate the
-classes at 0.925 AUROC before normalisation — and that gradient-based temporal
-explanations are faithful for real audio but fail entirely for generated audio,
-indicating that generation evidence is spectrally distributed rather than
-temporally localised. We release the protocol, the shortcut and bandwidth
-diagnostics, and the false-positive-rate-on-unseen-real-music test that exposes
-the failure.
+**Title:** Cross-generator detection of AI-generated music fails against unseen
+architectures: evidence from a controlled real corpus
 
 ---
 
-**Word count:** ~270. Trim the shortcut/explanation sentences for a 200-word cap.
+Generative systems such as Suno and Udio now synthesise complete songs that listeners struggle to distinguish from human-composed music, and detectors built to identify them are known to generalise poorly: reported F1 falls from 0.99 in-distribution to 0.629 on an unseen generator. We build a detector on the frozen MERT music foundation model (94.4 million parameters) with a 0.62 million-parameter attention-pooling head and evaluate it under a protocol designed to separate two failure modes that are routinely reported as one. Withholding Suno or Udio and testing on the other costs almost nothing (F1 degradation -0.037 and -0.023 against -0.361 reported previously), a result that invites the conclusion that such detectors generalise across generators. They do not. When we hold the corpus of real music genuinely fixed and vary only the generator, so that the same 58 MusicCaps recordings supply the real class throughout while the synthetic class moves from Suno/Udio to five unseen text-to-music models, AUROC falls from 0.996 to 0.531, chance, with the false-positive rate unchanged at 0.069 on both sides. The detector recognises real music exactly as well as before; it has stopped recognising generation. Against AudioLDM2 it performs below chance (AUROC 0.277), ranking generated audio as more authentic than human recordings. Suno and Udio transfer to each other only because they are near-identical commercial systems. We further separate this loss of discrimination from a distinct threshold failure, in which changing the corpus of real music drives the false-positive rate to 1.00 while leaving ranking intact, and show that reporting F1 alone conceals both: our cross-corpus F1 of 0.750 is exactly that of a classifier labelling every input synthetic. Ablations show the architecture is not what produces the in-distribution accuracy, and explanation audits show gradient-based temporal attribution is faithful for real audio and unfaithful for generated audio.
+
+---
+
+**Word count:** ~299.
+
+**Superseded.** An earlier draft argued the reverse: that cross-generator
+transfer was near-complete and the corpus of real music was what broke
+detection. The shared-real experiment refuted it. Holding the real class
+literally fixed, AUROC still falls to 0.531 while the false-positive rate does
+not move, so the discrimination loss is generator-driven. The FPR 1.00 seen on
+FakeMusicCaps is a separate threshold failure.
 
 ## Limitations to state in the paper (not the abstract)
 

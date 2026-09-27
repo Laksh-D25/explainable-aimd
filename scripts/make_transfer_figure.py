@@ -1,15 +1,14 @@
 """Figure: what transfers, and what does not.
 
-The two cross-generator experiments disagree sharply, and the disagreement is
-the finding. Holding the real class fixed and swapping the generator (Suno to
-Udio) barely dents the detector. Swapping the *real* class's corpus as well
-(SONICS to MusicCaps, as FakeMusicCaps requires) collapses it to near chance
-with every real clip called fake.
+Plotting AUROC beside false-positive rate shows that the two fail separately.
+Suno to Udio keeps both intact, but those are near-identical commercial systems.
+On FakeMusicCaps both collapse at once, which invites the reading that the real
+class is the cause.
 
-Plotting AUROC beside false-positive rate is what makes that legible: AUROC
-alone shows the collapse but not its mechanism, and FPR alone looks like a
-threshold problem. Together they say the detector stopped recognising real
-music, not that it failed on new generators.
+The shared-real experiment (scripts/shared_real_experiment.py) shows it is not:
+with the real class held literally fixed, AUROC still falls to chance while the
+false-positive rate does not move. So this figure shows two failures that happen
+to coincide here, not one mechanism. Its caption says so.
 
     python scripts/make_transfer_figure.py --out artifacts/figures
 """
@@ -85,7 +84,7 @@ def main() -> int:
         for i, v in enumerate(data[col]):
             ax.text(v + 0.02, i, fmt.format(v), va="center", fontsize=9, color=INK_MUTED)
 
-    fig.suptitle("Transfer survives a new generator, not a new corpus of real music",
+    fig.suptitle("Discrimination and false positives fail independently",
                  fontsize=11, color=INK, y=1.02)
     return 0 if _save(fig, args.out / "fig_transfer", data) else 0
 

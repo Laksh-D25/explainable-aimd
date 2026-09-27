@@ -14,11 +14,28 @@ removed, private and region-restricted recordings, so it is not a random sample.
 Splits were regenerated after subsampling, so the in-distribution figure is not
 directly comparable to SONICS's published results.
 
-\paragraph{Suno and Udio are a close pair}
-Both are commercial end-to-end song generators. Near-complete transfer between
-them is weaker evidence of generator-independence than transfer between
-architecturally distinct families would be, and should not be read as
-generalisation to arbitrary generators.
+\paragraph{The shared-real experiment is small}
+It trains on 300 songs and tests the real class on 58 held-out recordings. The
+effect it measures is large, a fall from 0.996 to 0.531, and the false-positive
+rate is stable across every comparison, but the confidence interval on any
+single per-generator figure is wide. AudioLDM2 at 0.277 is well below chance on
+133 comparisons; we would not defend the precise value, only the sign.
+
+\paragraph{Clip length and sample rate still differ from the main corpus}
+Harmonising to \SI{16}{\kilo\hertz} and ten seconds makes the three sources
+comparable to each other, and routing them all through one resampling chain
+removes the anti-alias signature, but it also means the shared-real results are
+not directly comparable to the full-length \SI{24}{\kilo\hertz} results
+reported elsewhere in this paper. The two should be read as separate
+experiments.
+
+\paragraph{Dynamic-range randomisation is implemented but not applied}
+Crest factor is scale-invariant and survives amplitude normalisation, and it
+remains among the largest contributors to the residual shortcut. Randomising
+dynamic range would reduce the residual from 0.769 to 0.760 on the main corpus
+and from 0.712 to 0.685 on the shared-real corpus in offline measurement. We
+report the numbers the detector actually trained under rather than retrofitting
+the mitigation.
 
 \paragraph{Corpus and generator are confounded in the cross-corpus arm}
 FakeMusicCaps changes the corpus, sample rate and clip length together with the

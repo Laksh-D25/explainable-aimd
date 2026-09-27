@@ -19,6 +19,7 @@ figure is saturated and should be read as a ceiling rather than a measurement of
 architectural quality (Section~\ref{sec:limitations}).
 
 \subsection{What the architecture contributes}
+\label{sec:ablation-note}
 
 The detector's novelty claim rests on the head: learned attention over all
 thirteen MERT layers, and learned attention rather than averaging when pooling
@@ -54,8 +55,8 @@ architectures can be credited with.
 
 Two things follow. The architectural contribution is not measurable on this
 corpus, so the case for the design has to rest on the explanations it makes
-available---which Section~\ref{sec:discussion} argues is where its value
-actually lies---rather than on accuracy. And the one variant that is not
+available, which Section~\ref{sec:discussion} argues is where its value
+actually lies, rather than on accuracy. And the one variant that is not
 identical is mean clip-to-song pooling, which is nominally the \emph{best} row.
 We draw no conclusion from that either: a single song separates it from the
 rest, and the run is one seed.
@@ -108,11 +109,13 @@ noise cost more than \SI{32}{\kilo\bit\per\second} MP3.}
 \label{fig:robustness}
 \end{figure}
 
-\subsection{Cross-generator with a shared corpus}
+\subsection{Cross-generator within one generator family}
 
 Table~\ref{tab:gensplit} reports both Suno/Udio directions. Each is trained on
 one generator and tested on the other, with real songs divided disjointly and
-both classes balanced in each half.
+both classes balanced in each half. Suno and Udio are both commercial
+end-to-end song generators, so this measures transfer \emph{within} a family;
+Section~\ref{sec:sharedreal} measures it across families.
 
 \begin{table}[!ht]
 \centering
@@ -131,14 +134,16 @@ Udio $\rightarrow$ Suno & 1.000 & 0.977 & 1.0000 & 0.000 & 0.022 \\
 
 Degradation is $-0.037$ and $-0.023$ in $F_1$, against the $-0.361$ reported by
 Cros Vila et al. False-positive rate is zero in both directions and calibration
-error remains near 0.03. Withholding an entire generative family, with the real
-class held fixed, costs the detector almost nothing.
+error remains near 0.03. Withholding either of these two generators costs the
+detector almost nothing. But Section~\ref{sec:sharedreal} shows this does not
+generalise past the pair, and that reading it as generator-independence is the
+error this paper is chiefly concerned with.
 
 \subsection{Cross-corpus}
 
-Evaluated on FakeMusicCaps---five unseen text-to-music generators (AudioLDM2,
+Evaluated on FakeMusicCaps, five unseen text-to-music generators (AudioLDM2,
 MusicGen, MusicLDM, Mustango, StableAudioOpen; 75 clips each) against 250
-MusicCaps recordings---the same detector reaches AUROC 0.598, marginally above
+MusicCaps recordings, the same detector reaches AUROC 0.598, marginally above
 chance, with ECE 0.365 and \textbf{FPR 1.00}. Per generator, AUROC ranges from
 0.438 (AudioLDM2, below chance) through 0.512, 0.618 and 0.654 to 0.770
 (Mustango).
@@ -149,21 +154,98 @@ the figure is the class ratio, not a result. Had we reported $F_1$ against the
 published 0.629 baseline we would have claimed a $+0.121$ improvement for a
 total failure.
 
-\subsection{The two results together}
+\subsection{Cross-generator with a genuinely shared real corpus}
+\label{sec:sharedreal}
 
-Figure~\ref{fig:transfer} places them side by side. Discrimination and
-recognition-of-real-music move together and identify the mechanism: FPR 1.00
-means every genuine MusicCaps recording was called synthetic. The detector did
-not fail to recognise new generators; it failed to recognise new real music.
+The preceding two results appear to say that generators transfer and corpora do
+not. They cannot establish that, because in the cross-corpus evaluation the
+generator and the corpus changed together. This section changes only the
+generator.
+
+The detector trains on 150 MusicCaps recordings against 150 Suno/Udio tracks and
+is tested against five unseen text-to-music models, with the same 58 held-out
+MusicCaps recordings supplying the real class in every comparison.
+Table~\ref{tab:sharedreal} reports the result.
+
+\begin{table}[!ht]
+\centering
+\caption{Cross-generator transfer with the real class held fixed. The same 58
+MusicCaps recordings are the real class in every row, which is why the
+false-positive rate does not move. Discrimination nonetheless falls to chance.}
+\label{tab:sharedreal}
+\begin{tabular}{lSSSS}
+\toprule
+Evaluation & {$F_1$} & {AUROC} & {FPR} & {ECE} \\
+\midrule
+In-distribution (Suno/Udio, seen)      & 0.958 & 0.996 & 0.069 & 0.045 \\
+Five unseen text-to-music models       & 0.138 & 0.531 & 0.069 & 0.790 \\
+\midrule
+\quad Mustango                         & 0.388 & 0.715 & 0.069 & 0.422 \\
+\quad MusicLDM                         & 0.049 & 0.612 & 0.069 & 0.548 \\
+\quad MusicGen                         & 0.141 & 0.562 & 0.069 & 0.529 \\
+\quad StableAudioOpen                  & 0.025 & 0.489 & 0.069 & 0.571 \\
+\quad AudioLDM2                        & 0.000 & 0.277 & 0.069 & 0.580 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+AUROC falls from 0.996 to \textbf{0.531}, which is chance, while the
+false-positive rate is identical at 0.069 on both sides. The detector recognises real
+music exactly as well as it did before. What it has lost is the ability to
+recognise generation: $F_1$ of 0.138 against an all-positive baseline of 0.928
+means it calls almost every generated clip real.
+
+Per generator the failure is graded, and at one end it is worse than chance.
+AudioLDM2 reaches AUROC 0.277: its output is ranked as \emph{more} authentic
+than human recordings, consistently enough to invert the ordering.
+Figure~\ref{fig:sharedreal} shows the profile.
+
+\begin{figure}[!ht]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_sharedreal.pdf}
+\caption{Discrimination against each generator, with the real class fixed. The
+leftmost bar is the generator family the detector was trained on; the rest are
+unseen. Four of the five sit at or below 0.62 and one falls below chance. The
+false-positive rate is 0.069 for every bar, because the real class never
+changes.}
+\label{fig:sharedreal}
+\end{figure}
+
+The control matters here, so we report both runs. An earlier version resampled
+only the SONICS tracks to \SI{16}{\kilo\hertz} and left the other sources at
+their native rate; it gave AUROC $1.000 \rightarrow 0.603$. Routing every source
+through one identical chain gives $0.996 \rightarrow 0.531$. The collapse grew
+under the control rather than dissolving, which is what distinguishes it from a
+resampling artefact.
+
+This corpus is also a better instrument than the one used above. Its shortcut
+residual is 0.712 against 0.769, and validation $F_1$ climbs from 0.897 over
+eight epochs rather than sitting at 1.000 from the first, so unlike
+Section~\ref{sec:ablation-note} it is capable of discriminating.
+
+\subsection{The three results together}
+
+Read in isolation, the Suno/Udio result says generators transfer and the
+FakeMusicCaps result says corpora do not. Section~\ref{sec:sharedreal} shows
+that reading is wrong. With the corpus held fixed, discrimination still falls to
+0.531, within noise of the 0.598 obtained when the corpus \emph{did} change.
+The corpus was never what destroyed discrimination.
+
+What the corpus changed was the operating point.
+Figure~\ref{fig:transfer} shows FPR going to 1.00 on FakeMusicCaps, and that
+remains a real and serious failure; but it is a threshold failure, separable
+from and additional to the loss of discrimination. The two move independently,
+which is precisely why both must be reported.
 
 \begin{figure}[!ht]
 \centering
 \includegraphics[width=\textwidth]{figures/fig_transfer.pdf}
-\caption{Transfer survives a new generator but not a new corpus of real music.
-Left: AUROC on the unseen generator. Right: the fraction of genuine recordings
-labelled synthetic. With the real class held fixed (Suno/Udio) AUROC is $\geq
-0.9995$ and FPR is zero; when the corpus of real music also changes
-(FakeMusicCaps) AUROC falls to 0.598 and every real clip is misclassified.}
+\caption{The two failures are independent. Left: AUROC on the unseen
+generator. Right: the fraction of genuine recordings labelled synthetic.
+Suno$\rightarrow$Udio keeps both intact, but Suno and Udio are near-identical
+commercial systems. On FakeMusicCaps AUROC falls to 0.598 \emph{and} every real
+clip is misclassified. Section~\ref{sec:sharedreal} separates these: the AUROC
+loss survives with the real class held fixed, the FPR failure does not.}
 \label{fig:transfer}
 \end{figure}
 
@@ -205,8 +287,8 @@ rank agreement between the attention profile and the Shapley attribution is
 negative for every audited song, and strongly so for real recordings (mean
 $-0.69$, against $-0.20$ for generated ones; overall $-0.45$). The layers the
 model's own gate weights most highly are not the layers whose removal moves the
-logit. Reporting Level~1 alone---the explanation the architecture supplies for
-free, and the one most readily quoted---would have produced a confident
+logit. Level~1 is the explanation the architecture supplies for free, and the
+one most readily quoted. Reporting it alone would have produced a confident
 explanation that the model's behaviour contradicts.
 
 \begin{figure}[!ht]

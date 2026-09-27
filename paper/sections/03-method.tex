@@ -41,7 +41,7 @@ objective that is reported. Probabilities are calibrated by temperature scaling
 fitted on validation, never on the evaluation set.
 
 Choosing the operating point required care. When validation separates the
-classes completely---which it does here---the conventional choice of the
+classes completely, which it does here, the conventional choice of the
 $(1-\alpha)$ quantile of scores on real music places the threshold immediately
 against the real class. That threshold is valid on validation and catastrophic
 elsewhere: applied to a shifted distribution it labels everything synthetic. We
@@ -73,11 +73,11 @@ each hidden state as a player and the logit under a renormalised subset as the
 coalition value. With thirteen layers the $2^{13}$ coalitions are affordable
 because the frozen backbone runs once and only the small head is re-evaluated.
 
-Levels 1 and 3 answer different questions---what the model weights, versus what
-moved a particular decision---and we report their disagreement rather than
+Levels 1 and 3 answer different questions. One asks what the model weights, the
+other what moved a particular decision, and we report their disagreement rather than
 averaging it away.
 
-\subsection{Explanation faithfulness}
+\subsection{Scoring explanations}
 
 No explanation is reported without being scored. We mask the regions an
 explanation marks important and measure the movement in the logit against

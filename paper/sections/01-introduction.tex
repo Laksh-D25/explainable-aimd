@@ -1,8 +1,8 @@
 \section{Introduction}
 \label{sec:introduction}
 
-Generative systems such as Suno and Udio synthesise complete songs---vocals,
-instrumentation, lyrics and arrangement---that listeners struggle to
+Generative systems such as Suno and Udio synthesise complete songs, with vocals,
+instrumentation, lyrics and arrangement, that listeners struggle to
 distinguish from professionally produced human music. Streaming platforms now
 report that a substantial fraction of newly uploaded tracks are machine
 generated, which turns detection from an academic question into an operational
@@ -25,31 +25,43 @@ in-distribution to 0.629 on an unseen generative family. That number is widely
 cited as the measure of the generalisation problem. We argue that it conflates
 two distinct failures, and that separating them changes what the problem is.
 
+Our own results made the case for separating them. Withholding an entire
+generator and testing on another cost us almost nothing. The $F_1$ degradation
+of 0.037 and 0.023 is an order of magnitude better than the published collapse,
+which reads as evidence that a frozen music foundation model generalises across
+generators. It is not. The two generators in that experiment, Suno and Udio, are
+commercial end-to-end song systems of closely similar design, and the real music
+was held fixed only in the sense of coming from one corpus. When we construct
+the comparison properly, holding the real recordings literally constant and
+substituting generators of genuinely different architecture, the same detector
+falls to chance.
+
 This paper makes four contributions.
 
 \begin{enumerate}
-  \item We build a detector on the frozen MERT music foundation
-        model~\cite{li2024mert} with a small attention-pooling head, and
-        evaluate it under a protocol that varies the generator and the corpus of
-        \emph{real} music independently. An ablation shows the head's design is
-        not what produces its accuracy: discarding twelve of the thirteen hidden
-        states, or replacing attention pooling with a mean, leaves every metric
-        unchanged.
-  \item We show that these two axes behave completely differently. Withholding
-        an entire generator while holding the real class fixed costs almost
-        nothing ($F_1$ degradation $-0.037$ and $-0.023$, against $-0.361$
-        reported previously). Changing the corpus of real music collapses the
-        same detector to near chance (AUROC 0.598) and causes it to label every
-        genuine recording as synthetic (FPR 1.00).
-  \item We give the explanation that reconciles them: the detector encodes what
-        the real music in its training corpus looks like, rather than what
-        generation leaves behind. Generalisation to new generators is therefore
-        not evidence of generalisation at all.
-  \item We report two diagnostics that any future work in this area can apply: a
-        shortcut test showing that global loudness and dynamic-range descriptors
-        alone separate the classes at 0.925 AUROC before normalisation, and a
-        false-positive-rate check on unseen real music that exposes the
-        corpus-dependence directly.
+  \item We identify a confound in the standard cross-generator protocol. When a
+        detector is tested on a new generator, the corpus of \emph{real} music
+        usually changes with it, so a failure cannot be attributed to either.
+        We separate the two by holding one real corpus fixed across the
+        comparison.
+  \item Under that control, cross-generator detection fails. A detector trained
+        against Suno and Udio falls from AUROC 0.996 to 0.531, chance,
+        against five unseen text-to-music models, while its false-positive
+        rate on the \emph{same} real recordings does not move (0.069 on both
+        sides). It has not stopped recognising real music; it has stopped
+        recognising generation. Against AudioLDM2 it is worse than useless
+        (AUROC 0.277), ranking generated audio as more authentic than human
+        recordings.
+  \item We show that apparent cross-generator success is an artefact of
+        generator similarity. Suno$\rightarrow$Udio transfer degrades $F_1$ by
+        only 0.037, but Suno and Udio are near-identical commercial systems.
+        Reported without a cross-architecture comparison, such a number invites
+        exactly the wrong conclusion.
+  \item We separate this loss of discrimination from a distinct threshold
+        failure, in which changing the corpus of real music leaves ranking
+        intact but drives the false-positive rate to 1.00, and give two cheap
+        diagnostics that expose both: a shortcut test on global descriptors, and
+        reporting the all-positive baseline beside every $F_1$.
 \end{enumerate}
 
 We also find that the $F_1$ conventionally reported in this setting can be
@@ -57,3 +69,9 @@ actively misleading: on our cross-corpus evaluation the detector's $F_1$ of
 0.750 is identical, to four decimal places, to that of a classifier that labels
 every input synthetic. Reporting $F_1$ alone would have presented a total
 failure as an improvement over the published baseline.
+
+The broader methodological point is that a cross-generator number is only as
+informative as the distance between the generators, and that distance is almost
+never reported. A protocol that does not state it, and does not hold the real
+class fixed, cannot distinguish a detector that has learned to identify
+synthesis from one that has learned to identify a particular synthesiser.

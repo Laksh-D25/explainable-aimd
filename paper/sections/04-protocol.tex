@@ -13,7 +13,7 @@ sub-classes are represented everywhere.
 
 We note a property of SONICS's own published splits that appears not to have
 been reported: its \texttt{id} field links a real song to the synthetic tracks
-generated from it, and 4{,}349 source identifiers---12.9\% of rows---appear in
+generated from it, and 4{,}349 source identifiers, 12.9\% of rows, appear in
 more than one official split. A real recording can therefore sit in the test set
 while a track generated from its lyrics and style sits in validation. We report
 this rather than repairing it, since re-splitting forfeits comparability with
@@ -23,20 +23,28 @@ published figures.
 
 Before any detector is trained we ask whether the classes are separable without
 reference to generation at all, by fitting a linear model on eight global
-descriptors of the recording---loudness, crest factor, spectral rolloff,
+descriptors of the recording: loudness, crest factor, spectral rolloff,
 centroid, zero-crossing rate and high-frequency energy share. None of these
 describe how audio was produced; a large AUROC means a 94-million-parameter
 transformer will find the same shortcut immediately.
 
 The first such test returned \textbf{0.925 AUROC}. Commercial releases are
 mastered loud and heavily compressed while generated tracks are not, so loudness
-and crest factor alone carried the classification. Peak normalisation reduced
-this to 0.840 and root-mean-square normalisation to 0.821; crest factor is
-scale-invariant and survives both. Randomising dynamic range---applied to both
-classes and to evaluation as well as training, since the aim is to remove a
-confound from the task rather than to augment one split---brought the residual
-to \textbf{0.714}, and to \textbf{0.737} on the final 910-song corpus. We report
-detector performance only against that baseline.
+and crest factor alone carried the classification. Replacing peak normalisation
+with root-mean-square normalisation removes the loudness component, and it is
+the normalisation the training path applies. Measured through that path, the
+residual on the 910-song corpus is \textbf{0.769}, with crest factor and peak
+the largest surviving contributors at 0.756 each.
+
+We state two caveats because they bear on how the number should be read. Crest
+factor is scale-invariant and therefore survives every amplitude normalisation;
+randomising dynamic range would smear it, and in offline measurement takes the
+residual to 0.760 on this corpus and 0.685 on the corpus of
+Section~\ref{sec:sharedreal}, but it is \emph{not} applied in the results we
+report. And the residual depends on which normalisation is measured: under peak
+normalisation the same corpus reads 0.737. We report 0.769 because it is what
+the detector actually sees. Detector performance should be read against that
+baseline, not against chance.
 
 A second diagnostic compares the spectral bandwidth of the two classes. Real
 audio fetched from streaming sources at one bitrate and generated audio
@@ -61,6 +69,36 @@ FakeMusicCaps pairs five unseen text-to-music generators with real music from
 MusicCaps. Here the generator \emph{and} the corpus of real music change
 together. We band-limit the real clips to the generated set's sample rate and
 verify bandwidth before reporting.
+
+\paragraph{Cross-generator with a genuinely shared real corpus.}
+The previous axis confounds two variables, so it cannot attribute a failure to
+either. This one separates them. A single real corpus of 250 MusicCaps
+recordings supplies the real class throughout. The detector trains against
+Suno and Udio and is tested against the five text-to-music models, with the
+\emph{same} held-out MusicCaps recordings on both sides. Nothing varies but the
+generator, so any change in discrimination is attributable to it and any change
+in false-positive rate cannot be.
+
+Making this comparison valid requires care, because the three sources arrive
+mismatched: MusicCaps at \SIrange{44.1}{48}{\kilo\hertz}, the text-to-music
+outputs at \SI{16}{\kilo\hertz}, and the SONICS tracks at \SI{24}{\kilo\hertz}
+and sixty seconds against ten. Training \SI{24}{\kilo\hertz} fakes against
+\SI{16}{\kilo\hertz} reals would teach the detector that energy above
+\SI{8}{\kilo\hertz} means \emph{real}; since every test clip is also capped at
+\SI{8}{\kilo\hertz} it would then call the whole test set real, producing a
+collapse with no generative content whatsoever. Every source is therefore
+resampled to \SI{16}{\kilo\hertz} and truncated to a ten-second centre window
+before training.
+
+That is still not sufficient. Resampling only the SONICS tracks stamps an
+anti-alias signature on one class, and a detector keyed to it would again call
+every untouched clip real, which is indistinguishable from the effect being
+measured. We
+therefore route \emph{every} source through one identical
+\SI{48}{\kilo\hertz}$\rightarrow$\SI{16}{\kilo\hertz} chain, including the files
+already at the target rate, and report that run. Section~\ref{sec:sharedreal}
+reports both, because the difference between them is the evidence that the
+control was necessary.
 
 \subsection{Reporting rules}
 
